@@ -1,0 +1,71 @@
+% README file for "help" program.
+% 
+% The "help" program essentially performs a paragraph-wise grep/search,
+% though with a number of additional features such as file inclusion.  Given
+% a series of words, "help" prints all the paragraphs that match all the
+% words.  One use for this is to locate matching records in a plaintext file,
+% such as an address list.  Another use is to find short notes you have
+% written to yourself that explain various important pieces of information.
+% For instance, you might issue commands such as
+%   help copier code
+%   help latex page break
+% and these would return whatever information you had previously placed in
+% the files that the help program searches.  To find out more about this
+% program, run
+%   help help program
+% 
+% Installation:
+%  1. Compile the help program.  (Optionally adjust the #define directives at
+%     the top of the file before compiling.)
+%  2. Copy this file to your home directory (referred to by your HOME
+%     environment variable).  Add additional information to this file, or
+%     place that information in other files and edit the \include
+%     directives at the end of this file.
+%  3. Optionally, define aliases that use the program in stylized ways.  For
+%     instance, I define "bibfind" as an alias for
+%       help .n .F ~/bib/bibroot
+%     which searches my bibliographies.  (The "bibroot" file contains \include
+%     directives for all my bibliography files.)
+% 
+% The help program was originally written by Ron Rivest.  It could probably
+% be recoded in several dozen lines of perl (but it already exists, so it's
+% easier to use it as it stands).
+
+General help:
+To obtain more help, type "help w1 w2 ..." where w1 w2 ... are keywords.
+    This will type out all paragraphs in the HELP files that
+    contain ALL of the words w1, w2, ... 
+    (type "help help program" for more information about "help")
+
+Information about the help program:
+ -- You invoke help by typing "help w1 w2 ..." where w1, w2, etc. are
+    keywords (or fragments of keywords) that you wish to search for.
+ -- The help program searches a number of "help files" that contain
+    paragraphs of helpful information.
+ -- Every paragraph that contains ALL of the desired keywords will be
+    printed.
+ -- The "root" help file is ($HOME)/HELP:
+      By creating ($HOME)/HELP you can create your own personal "help file"
+	      with reminders for yourself.  (You may also use a
+	      different file by using the .f flag, described below.)
+ -- Any help file can contain a line of the form "\include{filename}"
+      which causes help file "filename" to be searched as well.
+ -- Any line in a help file which begins with a % will be ignored.
+ -- Any help request which does not generate any output (except "Sorry")
+      will be appended to /a/aviary/HELP.NEEDED together with your
+      name.  Maybe one of the wizards will answer your query and update
+      the help file.  (By default, this is disabled in the DOS version.)
+ -- There are several optional flags, preceded by . (NOT - as is usual)
+      .m  enables more processing.
+      .n  causes the name of the file in which a paragraph was found to
+	      be printed before the paragraph itself.
+      .f filename  makes filename, instead of ~/HELP, the auxiliary help file.
+      .w  disables writing failed requests to /a/aviary/HELP.NEEDED.
+      .F filename  is like .w .f filename, but doesn't check /a/aviary/HELP.
+
+%% Sample \include directives.
+%% The filenames may contain "~/" but not "~user/".
+%% (This is a limitation of the help program.)
+% \include{~/wisdom/cvs-wisdom}
+% \include{~/wisdom/emacs}
+% \include{~/wisdom/java}
