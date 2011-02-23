@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings, NamedFieldPuns, ScopedTypeVariables, CPP #-}
+{-# LANGUAGE OverloadedStrings, NamedFieldPuns, 
+             ScopedTypeVariables, CPP, RecordWildCards #-}
 
 {- 
 
@@ -42,6 +43,7 @@ import System.FilePath
 import System.Environment
 import System.Console.GetOpt
 import System.Console.ANSI
+import System.Exit
 import System.IO.Unsafe (unsafePerformIO)
 import Debug.Trace
 
@@ -98,13 +100,13 @@ empty_line = "^[ \t]*$"
 partition_dateTags ::  Partitioner
 -- TODO: Since we are only matching the beginning of the line can this be made more efficient?
 partition_dateTags = 
-  Partitioner ("Date-tagged entries")
-	      (split (whenElt ((=~ date_regex) . fst)))
+  Partitioner ("DateTaggedEntries")
+	      (split (keepDelimsL$ whenElt ((=~ date_regex) . fst)))
 
 partition_paragraphs ::  Partitioner
 partition_paragraphs = 
   Partitioner ("Paragraphs")
-	      (split (whenElt ((=~ empty_line) . fst)))
+	      (split (keepDelimsL$ whenElt ((=~ empty_line) . fst)))
 
 ----------------------------------------------------------------------
 -- Quick test for a binary bytestream.  
@@ -116,7 +118,8 @@ partition_paragraphs =
 isBinaryFile :: BS.ByteString -> Bool
 isBinaryFile bs = 
    if bool 
-   then trace ("File disqualified based on: "++ show (BS.take 20$ BS.filter (not . isValidASCII) bs)) True
+   then -- trace ("File disqualified based on: "++ show (BS.take 20$ BS.filter (not . isValidASCII) bs)) 
+	True
    else False
   where 
    bool = BS.any (not . isValidASCII) bs
@@ -134,15 +137,16 @@ isValidASCII char =
 ----------------------------------------------------------------------
 
 -- type Loc = (String,String,Int)
-data Loc = Loc { file::String, method::String, line::Int } 
+data MatchHit = MatchHit { file::String, method::String, line::Int, matchtext::Lines }
   deriving Show
 
-data MatchTree = Match (String,Int,Lines) | Node [MatchTree]
+--data MatchTree = Match (String,Int,Lines) | Node [MatchTree]
+data MatchTree = Match MatchHit | Node [MatchTree]
   deriving Show
 
 #ifdef TEMP
 instance Pretty MatchTree where 
-  pPrint (Match (str,n,lines)) = text$ show (str,n)
+  pPrint (Match (MatchHit{method,line})) = text$ show (method,line)
   pPrint (Node ls) = text "(" <> sep (map pPrint ls) <> text ")"
 #endif
 
@@ -150,57 +154,62 @@ type PartialMatch = S.AtomSet -- Just the subset of terms that were matched.
 
 -- | @findHelp@ is a pure function that searches through a stream of
 --   text using a hierarchical scheme for subdividing its extent.
-findHelp :: [String] -> [Partitioner] -> Lines -> MatchTree
-findHelp terms partitioners lines = 
-    case loop partitioners 0 lines of 
+findHelp :: String -> [String] -> [Partitioner] -> Lines -> MatchTree
+findHelp filename terms partitioners lines = 
+    case loop "WholeFile" partitioners 0 lines of 
       Left _  -> Node []
       Right x -> x
  where 
    termset    = S.fromList (map toAtom terms)
    targetsize = S.size termset
 
+   -- See if we've hit all the terms:
    checkComplete partials possible = 
       if S.size partials == targetsize
       then Right$ Match possible
       else Left$ partials
 
    -- This loop returns a pair of (termMatches,MatchTree)
-   loop :: [Partitioner] -> Int -> Lines -> Either PartialMatch MatchTree
-   loop [] lineOffset text = 
+   loop :: String -> [Partitioner] -> Int -> Lines -> Either PartialMatch MatchTree
+   loop method [] lineOffset text = 
       -- Here we are at the "leaves" of the partitioning hierarchy.
       -- This is where we look for matches.
       -- let allwords = S.unions (map snd text) 
       -- 	  matches  = S.intersection termset allwords in 
       -- This version may be more efficient:
       let matches = S.unions$ map ((S.intersection termset) . snd) text in
-      checkComplete matches ("",lineOffset,text)
+      checkComplete matches (MatchHit filename method lineOffset text)
 
 
-   loop (Partitioner {pname,fun} : rest) lineOffset text = 
+   loop method (Partitioner {pname,fun} : rest) lineOffset text = 
       let 
           -- Here we recursively partition the text according to the NEXT partitioning scheme in the list.
           blocks     = fun text 
 	  -- We keep track of the line offset of all the blocks:
 	  indices    = scanl (+) lineOffset $ map length blocks
-	  submatches = zipWith (loop rest) indices blocks
+	  submatches = zipWith (loop pname rest) indices blocks
 	  completes  = rights submatches
 	  allpartials = S.unions (lefts  submatches)
       in
        if not (null completes) 
        -- If there are complete matches, we're not interested in sibling partial matches.
        then Right$ Node completes
-       else checkComplete allpartials (pname,lineOffset,text)
-
+       else checkComplete allpartials (MatchHit filename method lineOffset text)
 
 -- | Simplest method for presenting results:
 printMatchTree :: MatchTree -> IO ()
-printMatchTree (Match (name,int,lines)) =
+printMatchTree (Match MatchHit{..}) =
   do -- putStrLn$ chatter_tag ++ "Match in "++show name++" starting at line "++show int
-     putStrLn$ "------------------------------------------------------------"
-     putStrLn$  " Match in "++show name++" starting at line "++show int
-     putStrLn$ "------------------------------------------------------------"
-     B.putStrLn (delines lines)
-     putStrLn$ "--------------------------------------------------------------------------------"
+     let msg = chatter_tag++"Match in "++show file ++
+	                    ", granularity "++ show method++
+			    ", starting at line "++show line++":"
+	 sep = take (length msg) (repeat '-')
+--     putStrLn sep
+     putStrLn ""
+     putStrLn msg
+     putStrLn sep
+     B.putStrLn (delines matchtext)
+--     putStrLn$ "--------------------------------------------------------------------------------"
 printMatchTree (Node ls) = mapM_ printMatchTree ls 
 			   
 
@@ -210,7 +219,9 @@ printMatchTree (Node ls) = mapM_ printMatchTree ls
 depthFirst :: AnchoredDirTree String -> [String]
 depthFirst (root :/ tree) = loop tree
  where 
-  loop (File name file)    = [root ++ file]
+  abs = isAbsolute root
+  -- This is unintuitive but if the root dir was absolute then the filenames are also absolute:
+  loop (File name file)    = if abs then [file] else [root ++ file]
   loop (Dir name contents) = concatMap loop contents
   loop (Failed name err)   = 
      unsafePerformIO$
@@ -248,7 +259,7 @@ readAsLines path =
 		    else Just$ toAtom x
 	doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
 	pairs = map doline lines
-    when isBin$ putStrLn$ " Ignoring binary file: " ++ path
+    chatter 2$ " Ignoring binary file: " ++ path
     return (if isBin then Nothing else Just pairs)
 
 -- Find help within one file.
@@ -256,7 +267,7 @@ findHelpFile :: [String] -> [Partitioner] -> FilePath -> IO MatchTree
 findHelpFile terms partitioners file = 
   do x <- readAsLines file
      case x of 
-       Just lines -> return$ findHelp terms partitioners lines
+       Just lines -> return$ findHelp file terms partitioners lines
        Nothing    -> return$ Node []
 
 -- | Find help within multiple files.
@@ -273,29 +284,40 @@ findHelpFiles terms partitioners files =
 -- | Recognized flags
 data CmdFlag = 
       NoColor
+    | Help
     | HierarchyList String
     | CaseInsensitive
     | PrependDatePart
     | FollowIncludes
     | Root String
+    | Verbose (Maybe Int)
+--    | Verbose (Maybe String)
  deriving (Show,Eq)
 
--- Pure boilerplate, would be nice to scrap it:
+-- <boilerplate> Pure boilerplate, would be nice to scrap it:
 getRoot (Root x) = Just x
 getRoot _        = Nothing
 getHierarchy (HierarchyList str) = Just str
 getHierarchy _                   = Nothing
+getVerbose (Verbose x) = Just x
+getVerbose  _          = Nothing
+-- </boilerplate>
 
 
 options :: [OptDescr CmdFlag]
 options =
      [ 
-       Option ['r']  ["root"]   (ReqArg Root "PATH")          "set the root file or directory to search"
+       Option ['h']  ["help"]   (NoArg Help)                  "show this help information"
+     , Option ['r']  ["root"]   (ReqArg Root "PATH")          "set the root file or directory to search"
      , Option []     ["custom"] (ReqArg HierarchyList "LIST") "use a custom hierarchy of partition methods"
      , Option ['d']  ["date"]        (NoArg PrependDatePart)  "prepend a splitter on date-tags '[2011.02.21]' to the hierarchy list"
      , Option ['i']  ["ignore-case"] (NoArg CaseInsensitive)  "treat file contents and search terms as completely lower-case"
      , Option ['f']  ["follow"]      (NoArg FollowIncludes)   "follow \\include{...} expressions like the original 1988 'help'"
      , Option ['n']  ["nocolor"]     (NoArg NoColor)          "disable ANSI color output"
+
+--     , Option ['v']  ["verbose"]     (OptArg (fmap read . Verbose) "LVL")  
+     , Option ['v']  ["verbose"]     (OptArg (Verbose . fmap safeRead) "LVL")  
+		                     "set or increment verbosity level 0-3, default 1"
      ]
 
 usage = "\nVersion "++version++"\n"++
@@ -337,13 +359,20 @@ main =
 	 (o,rest,[])  -> return (o,rest)
          (_,_,errs)   -> defaultErr errs
 
-    putStrLn$ "Terms : " ++ show terms
-    putStrLn$ "OPTS: " ++ show opts
+    when (Help `elem` opts)$ do
+      putStrLn$ usageInfo usage options
+      exitSuccess
 
-    -- TEMPTOGGLE
-    writeIORef verbosityRef 2
+    case mapMaybe getVerbose opts of 
+      []        -> return ()
+      [Nothing] -> modifyIORef verbosityRef (+1)
+      [Just n]  -> writeIORef  verbosityRef n
+      _         -> error "More than one -verbose flag not currently allowed."
 
-    chatter 1 "Running help program..."
+    when (terms == [])$ defaultErr ["  NO SEARCH TERMS"]
+
+--    chatter 1 "Running help program..."
+    chatter 2$ "Searching for terms: " ++ show terms
 
     let readWName file = 
 	  do contents <- B.readFile file
@@ -361,8 +390,8 @@ main =
            else [partition_paragraphs]
 
         hierarchy = case mapMaybe getHierarchy opts of 
-		      []    -> undefined
-		      [str] -> undefined
+		      []    -> default_hierarchy
+		      [str] -> error "Custom hierarchy descriptions not implemented yet."
 	
 
     isdir    <- doesDirectoryExist root
@@ -372,8 +401,7 @@ main =
          chatter 2$ "Reading from root directory: "++show root
 	 tree <- readDirectoryWithL return root
 	 let allfiles = depthFirst tree
-	 B.putStrLn "\n All files found :"
-         print allfiles
+	 chatter 3 $ "\n All files found :" ++ show allfiles
 	 return$ filter isTextFile allfiles 
       else if isfile then do
          chatter 2$ "Reading from root file: "++show root
@@ -381,15 +409,18 @@ main =
       else 
 	 error$ "Root was not an existing directory or file!: "++ show root
 
-    B.putStrLn "\n All text files found :"
-    print txtfiles
-    B.putStrLn "\n All help results:"
+--    B.putStrLn "\n All text files found :"
+--    print txtfiles
+--    B.putStrLn "\n All help results:"
 
     allhelp <- findHelpFiles terms hierarchy txtfiles
-    putStrLn$ render (pPrint allhelp)
+
+-- Print out the structure of the match tree:
+--    putStrLn$ render (pPrint allhelp)
+
     printMatchTree allhelp
 
-    B.putStrLn "Done."
+--    B.putStrLn "Done."
 
 
 ----------------------------------------------------------------------
