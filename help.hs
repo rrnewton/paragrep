@@ -23,12 +23,20 @@ import Control.Monad
 import Control.Exception
 
 --import Data.ByteString.Char8  as B
-import qualified Data.ByteString.Lazy.Char8    as B
---import qualified Data.ByteString.Lazy.Internal as BI
-import Data.ByteString.Lazy.Internal
+import qualified Data.ByteString.Lazy.Char8    as BL
+import qualified Data.ByteString.Lazy.Internal as BI
 import qualified Data.ByteString.Char8         as BS
+
+-- This switch determines whether files are read lazily or in one go:
+-- #define LAZYMODE
+-- [2011.03.09] Right now I'm getting errors from too many files open in lazy mode.
+#ifdef LAZYMODE
+import qualified Data.ByteString.Lazy.Char8 as B
+#else 
+import qualified Data.ByteString.Char8      as B
+#endif 
+
 import Data.List.Split 
---import qualified Data.Set as S 
 import qualified StringTable.AtomSet as S 
 import StringTable.Atom
 import Data.Traversable
@@ -51,6 +59,7 @@ import System.Environment
 import System.Console.GetOpt
 import System.Console.ANSI
 import System.Exit
+import System.IO
 import System.IO.Unsafe (unsafePerformIO)
 import Debug.Trace
 
@@ -67,7 +76,7 @@ import Text.PrettyPrint.HughesPJClass
 -- split file into line array?
 -- 
 
-version = "0.0.1"
+version = "0.0.1.1"
 progName = "help"
 chatter_tag = " [help] "
 
@@ -77,6 +86,7 @@ chatter_tag = " [help] "
 -- Our main datatype for text includes both a wordset and the raw text:
 type Lines = [(B.ByteString, S.AtomSet)]
 
+delines :: Lines -> B.ByteString 
 delines = B.unlines . map fst 
 
 -- Hmm, why is this not defined in StringTable.AtomSet?
@@ -92,11 +102,11 @@ data Partitioner =
 		 fun   :: Lines -> [Lines] }
 
 --date_regex :: String
-date_regex :: B.ByteString
+date_regex :: BL.ByteString
 date_regex = -- mkRegex $ 
    "^ *\\[[0123456789][0123456789][0123456789][0123456789]\\.[0123456789][0123456789]\\.[0123456789][0123456789].*\\]"
 
-empty_line :: B.ByteString
+empty_line :: BL.ByteString
 -- empty_line = "^\\s*$"
 -- empty_line = "^[ ]*$"
 empty_line = "^[ \t]*$"
@@ -130,6 +140,20 @@ isBinaryFile bs =
    else False
   where 
    bool = BS.any (not . isValidASCII) bs
+
+
+-- Read only the first part of a file to determine if it is binary:
+-- Here we suffer extra system calls to read the file twice (peek then
+-- full read).  But we don't want to grep through large binary files!
+-- 
+-- 
+checkForBinaryFile path = 
+ do hndl  <- openFile path ReadMode
+    let target = 2000 -- Target number of bytes we want to check.
+    bytes <- B.hGet hndl target 
+    return (isBinaryFile bytes)
+
+
 
 -- Hmm... what could go here?
 isValidASCII char =
@@ -249,47 +273,66 @@ fileNames root = FP.find always pred root
 	 Just stat -> return (statusType stat == RegularFile)
 
 
+-- The file extensions that we think represent text files.
 isTextFile path = 
    case takeExtension path of 
      -- NOTE: Assuming that files with no extension are text files:
      ""     -> True
      ".txt" -> True
+     ".hs"  -> True
+     ".cpp" -> True
+     ".c"   -> True
      _      -> False
 
 -- An instance for lazy bytestrings:
-instance ToAtom B.ByteString where
-  toAtom Empty               = toAtom (""::String)
+instance ToAtom BL.ByteString where
+  toAtom BI.Empty                  = toAtom (""::String)
   -- A small optimization for one-chunk lazy bytestrings:
-  toAtom (Chunk chunk Empty) = toAtom chunk
+  toAtom (BI.Chunk chunk BI.Empty) = toAtom chunk
   -- Otherwise we have to copy it:
-  toAtom other = toAtom$ BS.concat (B.toChunks other)
+  toAtom other = toAtom$ BS.concat (BL.toChunks other)
 
+
+
+-- #ifdef LAZYMODE
+--         isBin = case BL.toChunks bytes of 
+-- 	          []  -> False -- Empty file.
+-- 		  h:_ -> isBinaryFile h
+-- #else
+--         isBin = isBinaryFile bytes
+-- #endif
 
 readAsLines :: String -> IO (Maybe Lines)
 readAsLines path = 
- do bytes <- B.readFile path
-    let lines = B.lines bytes
+ do 
+    isBin <- checkForBinaryFile path 
 
-        isBin = case B.toChunks bytes of 
-	          []  -> False -- Empty file.
-		  h:_ -> isBinaryFile h
+    if isBin then do
+      chatter 3$ " Ignoring binary file: " ++ path
+      return Nothing
 
-        -- Atoms are currently capped at 256 characters.. this should probably be documented...
-        tryAtom x = if B.length x > 256 then Nothing
-		    else Just$ toAtom x
-	doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
-	pairs = map doline lines
-    chatter 2$ " Ignoring binary file: " ++ path
+     else do
+
+      bytes <- B.readFile path
+      let lines = B.lines bytes
+	  -- Atoms are currently capped at 256 characters.. this should probably be documented...
+	  tryAtom x = if B.length x > 256 then Nothing
+		      else Just$ toAtom x
+
+	  doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
+	  pairs = map doline lines
+
+      return$ Just pairs
 
 #if 0
-    -- NEED TO CLOSE FILE HANDLES!
-    evaluate isBin
-    -- TEMP FIXME: TRYING THIS:
-    System.Mem.performGC
-    putStrLn$ "Performed GC."
+      -- NEED TO CLOSE FILE HANDLES!
+      evaluate isBin
+      -- TEMP FIXME: TRYING THIS:
+      System.Mem.performGC
+      putStrLn$ "Performed GC."
 #endif
 
-    return (if isBin then Nothing else Just pairs)
+
 
 
 -- Find help within one file.
@@ -321,6 +364,7 @@ data CmdFlag =
     | FollowIncludes
     | Root String
     | Verbose (Maybe Int)
+    | Version
 --    | Verbose (Maybe String)
  deriving (Show,Eq)
 
@@ -345,9 +389,10 @@ options =
      , Option ['f']  ["follow"]      (NoArg FollowIncludes)   "follow \\include{...} expressions like the original 1988 'help'"
      , Option ['n']  ["nocolor"]     (NoArg NoColor)          "disable ANSI color output"
 
---     , Option ['v']  ["verbose"]     (OptArg (fmap read . Verbose) "LVL")  
      , Option ['v']  ["verbose"]     (OptArg (Verbose . fmap safeRead) "LVL")  
-		                     "set or increment verbosity level 0-3, default 1"
+		                     "set or increment verbosity level 0-4, default 1"
+
+     , Option ['V']  ["version"] (NoArg Version)              "Show version number." 
      ]
 
 usage = "\nVersion "++version++"\n"++
@@ -389,6 +434,10 @@ main =
 	 (o,rest,[])  -> return (o,rest)
          (_,_,errs)   -> defaultErr errs
 
+    when (Version `elem` opts)$ do
+      putStrLn$ "\nVersion: "++version
+      exitSuccess
+
     when (Help `elem` opts)$ do
       putStrLn$ usageInfo usage options
       exitSuccess
@@ -403,10 +452,6 @@ main =
 
 --    chatter 1 "Running help program..."
     chatter 2$ "Searching for terms: " ++ show terms
-
-    let readWName file = 
-	  do contents <- B.readFile file
-	     return (file,contents)
 
     let 
         root = case mapMaybe getRoot opts of 
@@ -435,18 +480,17 @@ main =
 #else 
 	 allfiles <- fileNames root
 #endif
-	 chatter 1 $ " Found " ++ show (length allfiles) ++ " regular files."
-	 chatter 3 $ " All files found :" ++ show allfiles
+	 chatter 2 $ " Found " ++ show (length allfiles) ++ " regular files (following symlinks)."
+	 chatter 4 $ " All files found :" ++ show allfiles
+
+-- TODO/FIXME: This should be OPTIONAL: We might not care about file extensions:
 	 return$ filter isTextFile allfiles 
+
       else if isfile then do
          chatter 2$ "Reading from root file: "++show root
 	 return [root]
       else 
 	 error$ "Root was not an existing directory or file!: "++ show root
-
---    B.putStrLn "\n All text files found :"
---    print txtfiles
---    B.putStrLn "\n All help results:"
 
     allhelp <- findHelpFiles terms hierarchy txtfiles
 
@@ -455,7 +499,7 @@ main =
 
     printMatchTree allhelp
 
---    B.putStrLn "Done."
+--    BL.-putStrLn "Done."
 
 
 ----------------------------------------------------------------------
