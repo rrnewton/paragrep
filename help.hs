@@ -14,9 +14,13 @@
 
     The latter may be because of a problem with System.Directory.Tree.
     
+  [2011.03.08]
+    Switching from System.Directory.Tree to file
+
  -}
 
 import Control.Monad 
+import Control.Exception
 
 --import Data.ByteString.Char8  as B
 import qualified Data.ByteString.Lazy.Char8    as B
@@ -38,8 +42,11 @@ import Numeric (readDec)
 import Text.Regex.Posix
 import Prelude as P
 import System.Directory
-import System.Directory.Tree
+-- import System.Directory.Tree
+import System.FilePath.Find as FP
+
 import System.FilePath
+import System.Mem 
 import System.Environment
 import System.Console.GetOpt
 import System.Console.ANSI
@@ -215,7 +222,8 @@ printMatchTree (Node ls) = mapM_ printMatchTree ls
 
 --------------------------------------------------------------------------------
 
-
+#if 0
+-- Traverse a directory to get a list of paths to files, and symbolic links that point to files.
 depthFirst :: AnchoredDirTree String -> [String]
 depthFirst (root :/ tree) = loop tree
  where 
@@ -227,6 +235,35 @@ depthFirst (root :/ tree) = loop tree
      unsafePerformIO$
        do chatter 1$ " ERROR reading file "++ name++ ": "++ show err
 	  return []
+#endif
+
+
+
+fileNames :: String -> IO [String]
+fileNames root = FP.find always pred root
+ where
+  pred =
+--   fileType ==? RegularFile
+  -- FOLLOW SYMLINKS 
+    do stat  <- followStatus 
+       case stat of 
+         Nothing   -> (fileType ==? RegularFile)
+	 Just stat -> return (statusType stat == RegularFile)
+       -- isreg <- return ( stat) ==? RegularFile 
+       -- case isreg of 
+       --   Nothing -> return False
+       -- 	 Just x  -> return x
+  
+
+   -- BlockDevice	 
+   -- CharacterDevice	 
+   -- NamedPipe	 
+   -- RegularFile	 
+   -- Directory	 
+   -- SymbolicLink	 
+   -- Socket	 
+   -- Unknown
+
 
 
 isTextFile path = 
@@ -260,7 +297,17 @@ readAsLines path =
 	doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
 	pairs = map doline lines
     chatter 2$ " Ignoring binary file: " ++ path
+
+#if 0
+    -- NEED TO CLOSE FILE HANDLES!
+    evaluate isBin
+    -- TEMP FIXME: TRYING THIS:
+    System.Mem.performGC
+    putStrLn$ "Performed GC."
+#endif
+
     return (if isBin then Nothing else Just pairs)
+
 
 -- Find help within one file.
 findHelpFile :: [String] -> [Partitioner] -> FilePath -> IO MatchTree
@@ -399,9 +446,14 @@ main =
     txtfiles <- 
       if isdir then do
          chatter 2$ "Reading from root directory: "++show root
+#if 0
 	 tree <- readDirectoryWithL return root
 	 let allfiles = depthFirst tree
-	 chatter 3 $ "\n All files found :" ++ show allfiles
+#else 
+	 allfiles <- fileNames root
+#endif
+	 chatter 1 $ " Found " ++ show (length allfiles) ++ " regular files."
+	 chatter 3 $ " All files found :" ++ show allfiles
 	 return$ filter isTextFile allfiles 
       else if isfile then do
          chatter 2$ "Reading from root file: "++show root
