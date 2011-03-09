@@ -238,32 +238,15 @@ depthFirst (root :/ tree) = loop tree
 #endif
 
 
-
+-- Get all the files we're intrested in from within a directory.
 fileNames :: String -> IO [String]
 fileNames root = FP.find always pred root
  where
   pred =
---   fileType ==? RegularFile
-  -- FOLLOW SYMLINKS 
     do stat  <- followStatus 
        case stat of 
          Nothing   -> (fileType ==? RegularFile)
 	 Just stat -> return (statusType stat == RegularFile)
-       -- isreg <- return ( stat) ==? RegularFile 
-       -- case isreg of 
-       --   Nothing -> return False
-       -- 	 Just x  -> return x
-  
-
-   -- BlockDevice	 
-   -- CharacterDevice	 
-   -- NamedPipe	 
-   -- RegularFile	 
-   -- Directory	 
-   -- SymbolicLink	 
-   -- Socket	 
-   -- Unknown
-
 
 
 isTextFile path = 
