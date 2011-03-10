@@ -6,10 +6,19 @@ License-file:           LICENSE
 Stability:              Beta
 Maintainer:		Ryan Newton <rrnewton@gmail.com>
 Author:			Ryan Newton <rrnewton@gmail.com>, 
-Synopsis:               
+Synopsis:               Paragraph search of text files.  Flexible configuration of paragraph delineation.
 HomePage:               https://github.com/rrnewton/paragrep/wiki
 Description: 
-  
+
+   An expansion of Ron Rivest's 1988 'help' program for paragraph
+   search.  This program is useful for searching a personal
+   repository of ASCII notes.
+
+   It supports flexible text file partitioning methods.  The user can
+   configure a hierarchy of partitioning methods, ranging from whole
+   files to dated entries inside files, to paragraphs and individual
+   lines.
+
 
 Category: Utilities
 Cabal-Version: >=1.8

@@ -75,12 +75,13 @@ import Text.PrettyPrint.HughesPJ
 import Text.PrettyPrint.HughesPJClass
 #endif
 
--- split file into line array?
--- 
 
 version = "0.0.1.1"
-progName = "help"
-chatter_tag = " [help] "
+-- progName = "help"
+-- chatter_tag = " [help] "
+progName = "paragrep"
+chatter_tag = " [paragrep] "
+
 
 ----------------------------------------------------------------------
 
@@ -162,7 +163,6 @@ isValidASCII char =
   isPrint char ||
   isSeparator char || 
   isSpace char 
---  char == '\n'
 
 
 ----------------------------------------------------------------------
@@ -326,14 +326,6 @@ readAsLines path =
 
       return$ Just pairs
 
-#if 0
-      -- NEED TO CLOSE FILE HANDLES!
-      evaluate isBin
-      -- TEMP FIXME: TRYING THIS:
-      System.Mem.performGC
-      putStrLn$ "Performed GC."
-#endif
-
 
 
 
@@ -385,25 +377,32 @@ options =
      [ 
        Option ['h']  ["help"]   (NoArg Help)                  "show this help information"
      , Option ['r']  ["root"]   (ReqArg Root "PATH")          "set the root file or directory to search"
-     , Option []     ["custom"] (ReqArg HierarchyList "LIST") "use a custom hierarchy of partition methods"
      , Option ['d']  ["date"]        (NoArg PrependDatePart)  "prepend a splitter on date-tags '[2011.02.21]' to the hierarchy list"
      , Option ['i']  ["ignore-case"] (NoArg CaseInsensitive)  "treat file contents and search terms as completely lower-case"
-     , Option ['f']  ["follow"]      (NoArg FollowIncludes)   "follow \\include{...} expressions like the original 1988 'help'"
-     , Option ['n']  ["nocolor"]     (NoArg NoColor)          "disable ANSI color output"
-
      , Option ['v']  ["verbose"]     (OptArg (Verbose . fmap safeRead) "LVL")  
 		                     "set or increment verbosity level 0-4, default 1"
 
      , Option ['V']  ["version"] (NoArg Version)              "Show version number." 
+
+
+-- TODO / FIXME -- these still need to be implemented:
+--     , Option []     ["custom"] (ReqArg HierarchyList "LIST") "use a custom hierarchy of partition methods"
+--     , Option ['f']  ["follow"]      (NoArg FollowIncludes)   "follow \\include{...} expressions like the original 1988 'help'"
+
+--     , Option ['n']  ["nocolor"]     (NoArg NoColor)          "disable ANSI color output"
+
+
+
      ]
 
 usage = "\nVersion "++version++"\n"++
 	 "Usage: "++progName++" [OPTION...] searchterm1 [searchterm2 ...]\n\n"++	
 
-        "The "++progName++" program ____.\n\n"++
-
-        "As output .... \n"++
-        "   \n"++
+        "The "++progName++" program provides flexible search at paragraph\n"++
+	"granularity, or other custom granularities.  A list of partitioning\n"++
+	"methods splits files into progressively smaller pieces.  The program\n"++
+	"prints matching spans of text as output, printing the smallest delimited\n" ++
+	"span that matches.\n"++
 	"   \n"++
 
 	"\nOptions include:\n"
