@@ -1,0 +1,37 @@
+Name:           paragrep 
+Version:        0.1.1.1
+
+License:                BSD3
+License-file:           LICENSE
+Stability:              Beta
+Maintainer:		Ryan Newton <rrnewton@gmail.com>
+Author:			Ryan Newton <rrnewton@gmail.com>, 
+Synopsis:               
+HomePage:               https://github.com/rrnewton/paragrep/wiki
+Description: 
+  
+
+Category: Utilities
+Cabal-Version: >=1.8
+Tested-With: GHC == 7.0.1
+-- Portability:            Untested on Windows.
+
+build-type: Simple
+
+source-repository head
+  type:     git
+  location: git://github.com/rrnewton/paragrep.git
+
+-- ----------------------------------------------------------------------------------------------------
+Executable paragrep 
+  Main-is:        paragrep.hs
+  Build-Depends: base >= 4 && < 5
+               , bytestring
+               , prettyclass, pretty
+               , ansi-terminal
+               , filepath, filemanip, directory
+               , regex-posix
+               , stringtable-atom
+               , split
+
+  GHC-Options:    -O2 

@@ -15,7 +15,9 @@
     The latter may be because of a problem with System.Directory.Tree.
     
   [2011.03.08]
-    Switching from System.Directory.Tree to file
+    Switching from System.Directory.Tree to System.FilePath.Find
+
+  
 
  -}
 
