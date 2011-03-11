@@ -65,6 +65,7 @@ import System.IO
 import System.IO.Unsafe (unsafePerformIO)
 import Debug.Trace
 
+-- Considering possible pager type functionality for navigating results....
 -- import UI.HSCurses.Curses
 -- import UI.HSCurses.Widgets
 
@@ -304,8 +305,8 @@ instance ToAtom BL.ByteString where
 --         isBin = isBinaryFile bytes
 -- #endif
 
-readAsLines :: String -> IO (Maybe Lines)
-readAsLines path = 
+readAsLines :: Bool -> String -> IO (Maybe Lines)
+readAsLines caseinsensitive path = 
  do 
     isBin <- checkForBinaryFile path 
 
@@ -316,10 +317,12 @@ readAsLines path =
      else do
 
       bytes <- B.readFile path
-      let lines = B.lines bytes
+      let 
+          lower = if caseinsensitive then B.map toLower else id
+          lines     = B.lines bytes
 	  -- Atoms are currently capped at 256 characters.. this should probably be documented...
 	  tryAtom x = if B.length x > 256 then Nothing
-		      else Just$ toAtom x
+		      else Just$ toAtom (lower x)
 
 	  doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
 	  pairs = map doline lines
@@ -330,17 +333,17 @@ readAsLines path =
 
 
 -- Find help within one file.
-findHelpFile :: [String] -> [Partitioner] -> FilePath -> IO MatchTree
-findHelpFile terms partitioners file = 
-  do x <- readAsLines file
+findHelpFile :: Bool -> [String] -> [Partitioner] -> FilePath -> IO MatchTree
+findHelpFile caseinsensitive terms partitioners file = 
+  do x <- readAsLines caseinsensitive file
      case x of 
        Just lines -> return$ findHelp file terms partitioners lines
        Nothing    -> return$ Node []
 
 -- | Find help within multiple files.
-findHelpFiles :: [String] -> [Partitioner] -> [FilePath] -> IO MatchTree
-findHelpFiles terms partitioners files = 
-  do allhelp <- P.mapM (findHelpFile terms partitioners) files
+findHelpFiles :: Bool -> [String] -> [Partitioner] -> [FilePath] -> IO MatchTree
+findHelpFiles caseinsensitive terms partitioners files = 
+  do allhelp <- P.mapM (findHelpFile caseinsensitive terms partitioners) files
      return$ Node allhelp
 
 
@@ -430,7 +433,7 @@ chatter lvl str =
 main = 
  do 
     args <- getArgs
-    (opts,terms) <- 
+    (opts,terms_) <- 
        case getOpt Permute options args of
 	 (o,rest,[])  -> return (o,rest)
          (_,_,errs)   -> defaultErr errs
@@ -443,12 +446,15 @@ main =
       putStrLn$ usageInfo usage options
       exitSuccess
 
+    let caseinsensitive = CaseInsensitive `elem` opts
+
     case mapMaybe getVerbose opts of 
       []        -> return ()
       [Nothing] -> modifyIORef verbosityRef (+1)
       [Just n]  -> writeIORef  verbosityRef n
       _         -> error "More than one -verbose flag not currently allowed."
 
+    let terms = if caseinsensitive then map (map toLower) terms_ else terms_
     when (terms == [])$ defaultErr ["  NO SEARCH TERMS"]
 
 --    chatter 1 "Running help program..."
@@ -493,7 +499,7 @@ main =
       else 
 	 error$ "Root was not an existing directory or file!: "++ show root
 
-    allhelp <- findHelpFiles terms hierarchy txtfiles
+    allhelp <- findHelpFiles caseinsensitive terms hierarchy txtfiles
 
 -- Print out the structure of the match tree:
 --    putStrLn$ render (pPrint allhelp)
