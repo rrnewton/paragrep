@@ -17,7 +17,8 @@
   [2011.03.08]
     Switching from System.Directory.Tree to System.FilePath.Find
 
-  
+  [2011.04.06] 
+    Removing the WholeFile partition method from the default hierarchy.
 
  -}
 
@@ -188,9 +189,9 @@ type PartialMatch = S.AtomSet -- Just the subset of terms that were matched.
 
 -- | @findHelp@ is a pure function that searches through a stream of
 --   text using a hierarchical scheme for subdividing its extent.
-findHelp :: String -> [String] -> [Partitioner] -> Lines -> MatchTree
-findHelp filename terms partitioners lines = 
-    case loop "WholeFile" partitioners 0 lines of 
+findHelp :: String -> String -> [String] -> [Partitioner] -> Lines -> MatchTree
+findHelp initmethod filename terms partitioners lines = 
+    case loop initmethod partitioners 0 lines of 
       Left _  -> Node []
       Right x -> x
  where 
@@ -203,6 +204,7 @@ findHelp filename terms partitioners lines =
       then Right$ Match possible
       else Left$ partials
 
+   
    -- This loop returns a pair of (termMatches,MatchTree)
    loop :: String -> [Partitioner] -> Int -> Lines -> Either PartialMatch MatchTree
    loop method [] lineOffset text = 
@@ -228,7 +230,10 @@ findHelp filename terms partitioners lines =
        if not (null completes) 
        -- If there are complete matches, we're not interested in sibling partial matches.
        then Right$ Node completes
-       else checkComplete allpartials (MatchHit filename method lineOffset text)
+       -- We use method == "" to indicate that this level of the hierarchy should NOT generate output matches.
+       else if method == ""
+	    then Left allpartials
+	    else checkComplete allpartials (MatchHit filename method lineOffset text)
 
 -- | Simplest method for presenting results:
 printMatchTree :: MatchTree -> IO ()
@@ -333,17 +338,17 @@ readAsLines caseinsensitive path =
 
 
 -- Find help within one file.
-findHelpFile :: Bool -> [String] -> [Partitioner] -> FilePath -> IO MatchTree
-findHelpFile caseinsensitive terms partitioners file = 
+findHelpFile :: Bool -> String -> [String] -> [Partitioner] -> FilePath -> IO MatchTree
+findHelpFile caseinsensitive methodname  terms partitioners file = 
   do x <- readAsLines caseinsensitive file
      case x of 
-       Just lines -> return$ findHelp file terms partitioners lines
+       Just lines -> return$ findHelp methodname file terms partitioners lines
        Nothing    -> return$ Node []
 
 -- | Find help within multiple files.
-findHelpFiles :: Bool -> [String] -> [Partitioner] -> [FilePath] -> IO MatchTree
-findHelpFiles caseinsensitive terms partitioners files = 
-  do allhelp <- P.mapM (findHelpFile caseinsensitive terms partitioners) files
+findHelpFiles :: Bool -> String ->  [String] -> [Partitioner] -> [FilePath] -> IO MatchTree
+findHelpFiles caseinsensitive methodname terms partitioners files = 
+  do allhelp <- P.mapM (findHelpFile caseinsensitive methodname terms partitioners) files
      return$ Node allhelp
 
 
@@ -357,12 +362,13 @@ data CmdFlag =
     | Help
     | HierarchyList String
     | CaseInsensitive
-    | PrependDatePart
     | FollowIncludes
     | Root String
     | Verbose (Maybe Int)
     | Version
---    | Verbose (Maybe String)
+
+    | PrependDatePart
+    | WholeFile
  deriving (Show,Eq)
 
 -- <boilerplate> Pure boilerplate, would be nice to scrap it:
@@ -380,12 +386,17 @@ options =
      [ 
        Option ['h']  ["help"]   (NoArg Help)                  "show this help information"
      , Option ['r']  ["root"]   (ReqArg Root "PATH")          "set the root file or directory to search"
-     , Option ['d']  ["date"]        (NoArg PrependDatePart)  "prepend a splitter on date-tags '[2011.02.21]' to the hierarchy list"
      , Option ['i']  ["ignore-case"] (NoArg CaseInsensitive)  "treat file contents and search terms as completely lower-case"
      , Option ['v']  ["verbose"]     (OptArg (Verbose . fmap safeRead) "LVL")  
 		                     "set or increment verbosity level 0-4, default 1"
 
      , Option ['V']  ["version"] (NoArg Version)              "Show version number." 
+
+
+     , Option []  []  (NoArg undefined)  ""
+
+     , Option ['d']  ["date"]       (NoArg PrependDatePart)  "prepend a splitter on date-tags '[2011.02.21]' to the hierarchy list"
+     , Option ['w']  ["wholefile"]  (NoArg WholeFile)  "append the WholeFile granularity to the list of splitters"
 
 
 -- TODO / FIXME -- these still need to be implemented:
@@ -466,11 +477,16 @@ main =
 	        [r] -> r
 		_ -> error$ progName++": More than one --root option not currently supported"
 
-        default_hierarchy = 
-	   if PrependDatePart `elem` opts then
-  	        [partition_dateTags, partition_paragraphs]
-           else [partition_paragraphs]
-
+        hier1 = [partition_paragraphs]
+	hier2 = if PrependDatePart `elem` opts 
+		then partition_dateTags : hier1
+		else hier1 
+        default_hierarchy = hier2
+        initmethod = 
+	        if WholeFile `elem` opts 
+		then "WholeFile"
+		else ""
+                
         hierarchy = case mapMaybe getHierarchy opts of 
 		      []    -> default_hierarchy
 		      [str] -> error "Custom hierarchy descriptions not implemented yet."
@@ -499,7 +515,7 @@ main =
       else 
 	 error$ "Root was not an existing directory or file!: "++ show root
 
-    allhelp <- findHelpFiles caseinsensitive terms hierarchy txtfiles
+    allhelp <- findHelpFiles caseinsensitive initmethod terms hierarchy txtfiles
 
 -- Print out the structure of the match tree:
 --    putStrLn$ render (pPrint allhelp)
