@@ -42,5 +42,9 @@ Executable paragrep
                , regex-posix
                , stringtable-atom
                , split
+               , httpd-shed
+               , network
+               , containers
+               , json
 
   GHC-Options:    -O2 
