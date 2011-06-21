@@ -20,14 +20,18 @@ defaultHandler (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
      mapM_ print reqHeaders
      putStrLn$ "Body: " ++ show reqBody
 
+     -- let searchResults = ["a", "b", "c"]
 
      -- Create a JSON representation of the results:
-     let json = encode $ toJSObject $
+     let json = toJSObject $
                 [("header", showJSON "[2000.00.00] {blah blah}"),
 		 ("date", showJSON (3::Int)),
+		 ("year", showJSON (2000::Int)),
+		 ("month", showJSON (11::Int)),
+		 ("day", showJSON (11::Int)),
 		 ("body", showJSON "bodbodbod")]
 
-	 resBody = json
+	 resBody = encode [json,json,json]
 
      putStrLn$ "  Done handling request...\n"
      return (Response { resCode, resHeaders, resBody })     

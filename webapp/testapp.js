@@ -6,7 +6,9 @@ var jQT = $.jQTouch({
     statusBar: 'black'
 });
 
-
+var debug_mode = false;
+var global_searchterms;
+var global_result_array;
 
 // Bind event handlers:
 $(document).ready(function(){
@@ -73,8 +75,6 @@ function myjstest() {
     document.write('<p> Now an ABSENT field: ', localStorage.blahfield, '</p>');
 }
 
-var global_searchterms;
-
 
 function stripHeadersHack( str ) {
     // Simple hack for now -- I don't know the right way -- drop lines until we see one
@@ -101,26 +101,18 @@ function stripHeadersHack( str ) {
     }
 }
 
+// Make an entry with the appropriate information.
+function makeSearchHitListEntry( i, str ) 
+{
+    var result = "";
+    result += ('<li class="arrow"><a id="'+i+'" href="javascript:viewFull('+i+')">'
+               + str.header +"  |  "+ str.body +'</a></li>');   
+    return result;  
+}
+
+
 // This function dynamically produces a series of list elements.
 function generateResults() {
-
-    // Here we DYNAMICALLY create the searchResults page:
-    // document.write('<div id="searchResults">' + XBg
-    //     '<div class="toolbar">' +  
-    //     '<h1>Search Results</h1>'+ 
-    //     '<a class="button back" href="#">Back</a>'+ 
-    //     '</div>'+
-    //     '<ul class="edgetoedge">'+
-   	//     '<li class="arrow"><a id="0" href="#viewResult">Result one</a></li>'+
-    //     '<li class="arrow"><a id="1" href="#viewResult">Result two</a></li>'+
-	//     '<li class="arrow"><a id="2" href="#viewResult">Result three</a></li>'+
-    //     '</ul>'+
-    //                '</div>');
-
-    // document.write('<li class="arrow"><a id="0" href="#viewResult">Result 1</a></li>');
-    // // confirm(global_searchterms.split(' '));
-	// document.write('<li class="arrow"><a id="1" href="#viewResult">Result 2</a></li>');
-	// document.write('<li class="arrow"><a id="2" href="#viewResult">Result 3</a></li>');
 
     var results = '';
     var termArray = global_searchterms.split(' ');
@@ -131,8 +123,6 @@ function generateResults() {
     var url = "http://127.0.0.1:6003/";
     // var url = "http://192.168.1.4:6003/";
 
-    results += '<li class="arrow"><a id="0" href="#viewResult"> dummy result </a></li>';
-
     // Use jQuery to get search results from the remote server:
 
     // This one works but there is a parsing job:
@@ -140,31 +130,32 @@ function generateResults() {
     $.get(url, { name: "aUser", terms: global_searchterms },
       function(data){
          got_result = true;
-         alert("Data Loaded, type "+ typeof(data)  +":\n <" + data + ">");
+         if(debug_mode) alert("Data Loaded, type "+ typeof(data)  +":\n <" + data + ">");
          
          var stripped = stripHeadersHack(data);
          var parsed = jQuery.parseJSON( stripped );
-         // var parsed = JSON.parse( stripped); // This seems to work too.
-         // alert("Parsed: " + typeof(parsed) +" "+ parsed);
-         alert("Parsed fields: "+ parsed.date +" "+ parsed.header +" "+ parsed.body );
+         global_result_array = parsed;
+         // alert("Parsed: "+ parsed );
+         // alert("Parsed fields: "+ parsed.date +" "+ parsed.header +" "+ parsed.body );
 
-	 results += '<li class="arrow"><a id="0" href="#viewResult"> dummy result TWO </a></li>';
+         var i = 0;
+	 $.each(parsed, function(key, item) 
+	 {
+	     // alert("Typeof "+ typeof(item) + ".  Item itself: "+ item);
+	     results += makeSearchHitListEntry(i, item);
+	     // results += '<li class="arrow"><a id="0" href="#viewResult">' + item +'</a></li>';
+	     i++;
+	 });
+
+
+         // results += makeSearchHitListEntry(parsed);
+ 	 //result += '<li class="arrow"><a id="0" href="#viewResult">' + parsed.header  +'</a></li>';
+	 // results += '<li class="arrow"><a id="0" href="#viewResult"> HUH </a></li>';
+
 
          document.getElementById("searchResultsContent").innerHTML = results;
       }, "html");
     //--------------------------------------------------------------------------------
-
-
-    //--------------------------------------------------------------------------------
-    // alert('blah');  
-    // var req = new XMLHttpRequest();
-    // req.open('GET', url, false); 
-	// req.setRequestHeader('User-Agent','XMLHTTP/1.0');
-    // req.send(null);
-    // var headers = req.getAllResponseHeaders().toLowerCase();
-    // alert(headers);  
-    //--------------------------------------------------------------------------------
-
 
     // THIS ONE ISNT WORKING:
     //--------------------------------------------------------------------------------
@@ -217,29 +208,10 @@ function sendSearch() {
     jQT.goTo("#searchResults", false, false);
 }
 
-// Do an http request to get the results:
-// ====================================================================================================
-// $.get(
-//     "somepage.php",
-//     {paramOne : 1, paramX : 'abc'},
-//     function(data) {
-//        alert('page content: ' + data);
-//     }
-// );
+function viewFull(ind) {
+    var entry = global_result_array[ind];    
+    // Mutate the target page so it has the desired contents:
+    document.getElementById("viewFullContent").innerHTML = entry.body;
+    jQT.goTo("#viewFull", false, false);
+}
 
-// $.get("test.cgi", { name: "John", time: "2pm" },
-//    function(data){
-//      alert("Data Loaded: " + data);
-//    });
-
-// Someone claims jquery is not necessary that this is builtin:
-// function httpGet(theUrl)
-//     {
-//     var xmlHttp = null;
-
-//     xmlHttp = new XMLHttpRequest();
-//     xmlHttp.open( "GET", theUrl, false );
-//     xmlHttp.send( null );
-//     return xmlHttp.responseText;
-//     }
-// ====================================================================================================
