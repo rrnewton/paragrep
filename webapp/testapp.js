@@ -76,6 +76,25 @@ function stripHeadersHack( str ) {
     // Simple hack for now -- I don't know the right way -- drop lines until we see one
     // containing '{'.
     
+    var arr = str.split('\n');
+    var len = arr.length;
+    var i = 0;
+    while ( arr[i].indexOf('{') == -1  && i < len ) {
+        i++;
+    }
+
+    // for(var j=0; j<i; j++) {   delete arr[j];    }
+    if (i === len) 
+    {
+        alert("Bad response from server.  Apparently containing no JSON object.");
+        return false;
+    }
+    else 
+    {
+        var pruned = arr.slice(i);
+        var final = pruned.join('\n');
+        return final;
+    }
 }
 
 // This function dynamically produces a series of list elements.
@@ -118,9 +137,10 @@ function generateResults() {
          alert("Data Loaded, type "+ typeof(data)  +":\n " + data);
          
          var stripped = stripHeadersHack(data);
-
-         // var parsed = jQuery.parseJSON( data );
-         // alert("Parsed: "+ parsed);
+         var parsed = jQuery.parseJSON( stripped );
+         // var parsed = JSON.parse( stripped); // This seems to work too.
+         // alert("Parsed: " + typeof(parsed) +" "+ parsed);
+         alert("Parsed fields: "+ parsed.date +" "+ parsed.header +" "+ parsed.body );
 
          document.getElementById("searchResultsContent").innerHTML = results;
       }, "html");
