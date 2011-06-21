@@ -7,17 +7,21 @@ var jQT = $.jQTouch({
 });
 
 
-// Extra library functions
-// ================================================================================
 
+// Bind event handlers:
 $(document).ready(function(){
     $('#settings form').submit(saveSettings);
     $('#settings').bind('pageAnimationStart', loadSettings);
 
     $('#settings').bind('resetaction', resetSettings);
 
-    $('#startSearch form').submit(sendSearch);
+    //    $('#startSearch form').submit(sendSearch);
+    $('#home form').submit(sendSearch);
 });
+
+
+// Extra library functions
+// ================================================================================
 
 function saveSettings() {
     localStorage.dateformat = $('#dateformat').val();
@@ -62,7 +66,7 @@ function loadSettings() {
     $('#searchroot').val(localStorage.searchroot);
     $('#wholefile').val(localStorage.wholefile);
     // confirm('Settings loaded');
-4}
+}
 
 function myjstest() {
     document.write('<p> Test of local storage, looking up field1: ', localStorage.testfield, '</p>');
@@ -123,7 +127,9 @@ function generateResults() {
 
     var got_result = false;
     // var url = "http://wasp.ffh.us:6003/";
-    var url = "http://localhost:6003/";
+    // var url = "http://localhost:6003/";
+    var url = "http://127.0.0.1:6003/";
+    // var url = "http://192.168.1.4:6003/";
 
     results += '<li class="arrow"><a id="0" href="#viewResult"> dummy result </a></li>';
 
@@ -134,13 +140,15 @@ function generateResults() {
     $.get(url, { name: "aUser", terms: global_searchterms },
       function(data){
          got_result = true;
-         alert("Data Loaded, type "+ typeof(data)  +":\n " + data);
+         alert("Data Loaded, type "+ typeof(data)  +":\n <" + data + ">");
          
          var stripped = stripHeadersHack(data);
          var parsed = jQuery.parseJSON( stripped );
          // var parsed = JSON.parse( stripped); // This seems to work too.
          // alert("Parsed: " + typeof(parsed) +" "+ parsed);
          alert("Parsed fields: "+ parsed.date +" "+ parsed.header +" "+ parsed.body );
+
+	 results += '<li class="arrow"><a id="0" href="#viewResult"> dummy result TWO </a></li>';
 
          document.getElementById("searchResultsContent").innerHTML = results;
       }, "html");
