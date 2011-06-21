@@ -1,0 +1,145 @@
+<link type="text/css" rel="stylesheet" media="screen" href="jqtouch/jqtouch.css">
+<link type="text/css" rel="stylesheet" media="screen" href="themes/jqt/theme.css">
+<script type="text/javascript" src="jqtouch/jquery.js"></script>
+<script type="text/javascript" src="jqtouch/jqtouch.js"></script>
+<script type="text/javascript" src="testapp.js"></script>
+
+<html>
+    <head>
+        <title>Personal Notes DB</title>
+    </head>
+    <body>
+        <div id="home">
+            <div class="toolbar">
+                <h1>My Notes DB</h1>
+                <a class="button flip" href="#settings">Settings</a>
+            </div>
+            <ul class="edgetoedge">
+                <li class="arrow"><a href="#startSearch">New Search</a></li>
+                <li class="arrow"><a href="#about">About</a></li>
+                <!-- <li class="arrow"><a href="#query">Query</a></li> -->
+            </ul>
+        </div>
+
+        <div id="about">
+            <div class="toolbar">
+                <h1>About</h1>
+                <a class="button back" href="#">Back</a>
+            </div>
+            <div>
+	      <center>
+                <p>A simple test application..</p>
+		<p> <br> </p>
+		<script type="text/javascript">
+		    myjstest();
+		</script>
+	      </center>
+            </div>
+        </div>
+
+<!-- ---------------------- Actual Search Process -------------------------- -->
+
+<!-- <div id="query"> -->
+<!--     <div class="toolbar"> -->
+<!--         <h1>Enter Search Terms</h1> -->
+<!--         <a class="button back" href="#">Back</a> -->
+<!--         <a class="button slideup" href="#startSearch">+</a> -->
+<!--     </div> -->
+<!--     <ul class="edgetoedge"> -->
+<!--         <li id="entryTemplate" class="entry" style="display:none"> -->
+<!--             <span class="keywords">Keywords</span> -->
+<!--             <\!-- <span class="calories">000</span> -\-> -->
+<!--             <span class="delete">Delete</span> -->
+<!--         </li> -->
+<!--     </ul> -->
+<!-- </div> -->
+
+
+<div id="startSearch">
+    <div class="toolbar">
+        <h1>New Search</h1>
+        <a class="button cancel" href="#">Cancel</a>
+    </div>
+    <form method="post">
+        <ul>
+            <li><input type="text" placeholder="Space-Separated Search Terms" name="searchterms" id="searchterms" 
+	         style="color:rgb(255,255,255)"
+                 autocapitalize="off" autocorrect="off" autocomplete="off" /></li>
+
+            <li><input type="submit" class="submit" name="searchaction"
+                value="Do Search" /></li>
+
+            <!-- <a style="margin:0 10px;color:rgba(0,0,0,.9)" href="#" class="submit whiteButton">Submit</a> -->
+        </ul>
+    </form>
+</div>
+
+
+<!-- Compromise: here we have a static searchResults entry but we dynamically replace its content from javascript: -->
+<div id="searchResults">
+     <div class="toolbar">
+	 <h1>Search Results</h1>
+	 <a class="button back" href="#">Back</a>
+     </div>
+     <ul class="edgetoedge" id="searchResultsContent">
+	 <!-- <li class="sep">Results:</li> -->
+	 <!-- <li class="arrow"><a id="0" href="#viewResult">Result one</a></li> -->
+	 <!-- <li class="arrow"><a id="1" href="#viewResult">Result two</a></li> -->
+	 <!-- <li class="arrow"><a id="2" href="#viewResult">Result three</a></li> -->
+	 <!-- <script type="text/javascript"> -->
+	 <!--     generateResults(); -->
+	 <!-- </script> -->
+
+     </ul>
+ </div>
+
+
+<!-- ----------------------------- Settings --------------------------------- -->
+
+
+<div id="settings">
+    <div class="toolbar">
+        <h1>Settings UNFINISHED</h1>
+        <a class="button cancel" href="#">Cancel</a>
+        <a class="button flip" href="javascript:resetSettings()">Restore Defaults</a>
+    </div>
+    <form method="post">
+        <ul class="edgetoedge">
+
+            <li class="sep">Date Format:</li>
+            <li><input placeholder="Text here - UNFINISHED" type="text" name="dateformat" id="dateformat" style="color:rgb(255,255,255)"/></li>
+
+            <li class="sep">User Name:</li>
+            <li><input placeholder="Text here - UNFINISHED" type="text" name="username" id="username" style="color:rgb(255,255,255)" /></li>
+
+            <li class="sep">Search Root:</li>
+            <li><input placeholder="Text here - UNFINISHED" type="text" name="searchroot" id="searchroot" style="color:rgb(255,255,255)" /></li>
+
+            <li class="sep">Include WholeFile Matches<span class="toggle"><input type="checkbox" id="wholefile"/></span></li>
+
+            <li><input type="submit" class="submit" name="saveaction" value="Save Changes" /></li>
+            <!-- <li><input type="button" class="button" name="resetaction" value="Reset to Defaults" /></li> -->
+
+
+<!-- Can't figure out how to get them HORIZONTAL: -->
+	   <!-- <ul class="individual"> -->
+	   <!--     <\!-- <li><a href="foobar">Email</a></li> -\-> -->
+	   <!--     <\!-- <li><a target="_blank" href="http://tinyurl.com/support-jqt">Donate</a></li> -\-> -->
+
+           <!--     <input type="submit" class="submit" name="saveaction" value="Save Changes" /> -->
+           <!--     <input type="submit" class="submit" name="resetaction" value="Reset to Defaults" /> -->
+
+           <!--     <\!-- <li><input type="submit" class="submit" name="saveaction" value="Save Changes" /></li> -\-> -->
+           <!--     <\!-- <li><input type="submit" class="submit" name="resetaction" value="Reset to Defaults" /></li> -\-> -->
+	   <!-- </ul> -->
+
+
+        </ul>
+    </form>
+</div>
+
+
+
+<!-- -------------------------------- End ---------------------------------- -->
+    </body>
+</html>
