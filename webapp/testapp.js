@@ -36,7 +36,7 @@ function saveSettings() {
 }
 
 function resetSettings() {
-    if ( confirm('Are you sure you want to restore the settings? ') ) 
+    if ( confirm('Are you sure you want to restore the settings? ') )
     {
        delete localStorage.dateformat;
        delete localStorage.username;
@@ -55,7 +55,7 @@ function resetSettings() {
 
        // FAIL:
        // jQT.goTo("#settings", false, false);
-       
+
        // Fails to properly reload values:
        // jQT.goBack();
        return false;
@@ -79,7 +79,7 @@ function myjstest() {
 function stripHeadersHack( str ) {
     // Simple hack for now -- I don't know the right way -- drop lines until we see one
     // containing '{'.
-    
+
     var arr = str.split('\n');
     var len = arr.length;
     var i = 0;
@@ -88,12 +88,12 @@ function stripHeadersHack( str ) {
     }
 
     // for(var j=0; j<i; j++) {   delete arr[j];    }
-    if (i === len) 
+    if (i === len)
     {
         alert("Bad response from server.  Apparently containing no JSON object.");
         return false;
     }
-    else 
+    else
     {
         var pruned = arr.slice(i);
         var final = pruned.join('\n');
@@ -102,14 +102,14 @@ function stripHeadersHack( str ) {
 }
 
 // Make an entry with the appropriate information.
-function makeSearchHitListEntry( i, str ) 
+function makeSearchHitListEntry( i, str )
 {
     var result = "";
     result += ('<li class="arrow"><a id="'+i+'" href="javascript:viewFull('+i+')">'
                // + str.header +"  |  "+ str.body +'</a></li>'
 	       + str.header +'</a></li>'
-	       );   
-    return result;  
+	       );
+    return result;
 }
 
 
@@ -120,23 +120,37 @@ function generateResults() {
     var termArray = global_searchterms.split(' ');
 
     var got_result = false;
+    var port = 6003;
+    var url = "http://localhost:"+port+"/";
     // var url = "http://wasp.ffh.us:6003/";
-    var url = "http://localhost:6003/";
     // var url = "http://127.0.0.1:6003/";
-    // var url = "http://192.168.1.4:6003/";
 
     // Use jQuery to get search results from the remote server:
 
-    results += '<li class="arrow"><a id="blah" href="#searchResults"> Loading results from: '+ url +'</a></li>';
+    if (  window.location.protocol === "http:" &&
+        ! window.location.hostname === "" )
+    {
+        url = "http://" + window.location.hostname + ":"+port+"/";
+    }
+
+    //    results += '<li class="arrow"><a id="blah" href="#searchResults"> Current site URL: '+ document.URL +'</a></li>';
+    results += '<li class="sep">Loading results from: '+ url +'</li>';
+
+    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL protocol: '+ window.location.protocol +'</a></li>';
+    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL Host: '+ window.location.hostname +'</a></li>';
+    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL Href: '+ window.location.href +'</a></li>';
+
     document.getElementById("searchResultsContent").innerHTML = results;
 
     // This one works but there is a parsing job:
     //--------------------------------------------------------------------------------
-    $.get(url, { name: "aUser", terms: global_searchterms },
-      function(data){
+    $.get(url, { name: "aUser"
+	       , command: "search"
+	       , terms: global_searchterms },
+	  function(data){
          got_result = true;
          if(debug_mode) alert("Data Loaded, type "+ typeof(data)  +":\n <" + data + ">");
-         
+
          var stripped = stripHeadersHack(data);
          var parsed = jQuery.parseJSON( stripped );
          global_result_array = parsed;
@@ -144,7 +158,7 @@ function generateResults() {
          // alert("Parsed fields: "+ parsed.header +" "+ parsed.body );
 
          var i = 0;
-	 $.each(parsed, function(key, item) 
+	 $.each(parsed, function(key, item)
 	 {
 	     // alert("Typeof "+ typeof(item) + ".  Item itself: "+ item);
 	     results += makeSearchHitListEntry(i, item);
@@ -164,15 +178,15 @@ function generateResults() {
 
     // THIS ONE ISNT WORKING:
     //--------------------------------------------------------------------------------
-    // $.getJSON( url, 
+    // $.getJSON( url,
     //            { name: "aUser", terms: global_searchterms },
-    //            function(data) 
+    //            function(data)
     // {
     //     alert("Data Loaded:\n " + data);
 
     //     var items = [];
 
-    //     $.each(data, function(key, item) 
+    //     $.each(data, function(key, item)
     //     {
     //         results += '<li class="arrow"><a id="0" href="#viewResult">' + key + '</a></li>';
     //     });
@@ -193,7 +207,7 @@ function generateResults() {
     // ----------------------------------------------------------------------------------------------------
 
     // HMM, I get the below error and THEN I get the data loaded... it must be asynchronous.
-    // if (got_result) 
+    // if (got_result)
     //      alert("Done fetching results!");
     // else alert("ERROR: Could not get result from server.");
 
@@ -214,7 +228,7 @@ function sendSearch() {
 }
 
 function viewFull(ind) {
-    var entry = global_result_array[ind];    
+    var entry = global_result_array[ind];
     // Mutate the target page so it has the desired contents:
     document.getElementById("viewFullContent").innerHTML = entry.body;
     jQT.goTo("#viewFull", false, false);

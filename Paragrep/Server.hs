@@ -6,9 +6,11 @@ module Paragrep.Server ( runServer, defaultHandler ) where
 import Paragrep.Lib
 
 import Data.List.Split
+import Data.Maybe
 import qualified Data.Map as M
 import Network.Shed.Httpd
 import Network.URI
+import qualified Network.HTTP as N
 import Text.JSON
 
 #ifdef LAZYMODE
@@ -45,8 +47,9 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
 
 --  do putStrLn$ "Handling request " ++ reqMethod ++" "++ show (queryToArguments$ uriQuery reqURI)
   do 
-
-     putStrLn$ "Handling request " ++ reqMethod ++" uritostring "++ (uriToString id reqURI "")     
+     let uristr = uriToString id reqURI ""
+		  -- uriQuery reqURI
+     putStrLn$ "Handling request, method " ++ reqMethod ++", args "++ show args ++ " : "++ uristr
 #if 0
      putStrLn$ " queryToArguments " ++ show (args)
      putStrLn$ " Search terms " ++ show terms
@@ -55,33 +58,55 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
      putStrLn$ "Body: " ++ show reqBody
 #endif
 
-     ----------------------------------------------------------------------
-     -- Do the actual work:
-     txtfiles <- listAllFiles root
-     allhelp <- findHelpFiles False "" terms [partition_dateTags, partition_paragraphs] txtfiles
-     -- Print out the structure of the match tree:
-     --    putStrLn$ render (pPrint allhelp)
-     printMatchTree allhelp
-     ----------------------------------------------------------------------
+     case M.lookup "command" args of 
 
-     -- Create a JSON representation of the results:
-     let 
-         -- json = toJSObject $
-         --        [("header", showJSON "[2000.00.00] {blah blah}"),
-	 -- 	 ("date", showJSON (3::Int)),
-	 -- 	 ("year", showJSON (2000::Int)),
-	 -- 	 ("month", showJSON (11::Int)),
-	 -- 	 ("day", showJSON (11::Int)),
-	 -- 	 ("body", showJSON "bodbodbod")]
+      ------------------------------------------------------------
+      -- Heuristic: If it is a normal http request we send it through to apache to serve.
+      -- TOFIX: We could do this ourselves and serve up the webapp directly.
+      Nothing -> do 
+	  putStrLn$ "   => REDIRECTING query to apache... "
+	  response <- N.simpleHTTP $ N.Request 
+	       -- Redirect to localhost on the normal port:
+	       { N.rqURI     = fromJust$ parseURI$ "http://localhost:80/" ++ uristr
+               , N.rqMethod  = N.GET
+	       , N.rqHeaders = []
+	       , N.rqBody    = reqBody
+	       }
+	  case response of 
+	    Left connErr -> error$ "simpleHTTP: connection ERROR: " ++ show connErr
+	    Right (N.Response{N.rspCode,N.rspHeaders,N.rspBody}) -> return$
+	       Response { resCode = 0   -- TODO: translate the code
+			, resHeaders= map (\ (N.Header k s) -> (show k,s)) rspHeaders
+			, resBody = rspBody }
 
-         jsarr = showJSON$ map matchToJSON (matchTreeToList allhelp)
-	 jsobj = toJSObject $ 
-	    [("resultArray", jsarr)
-	    ]
-	 resBody = encode jsarr
+      -- Otherwise  we've got a request for the web app itself:
+      ------------------------------------------------------------
+      Just "search" -> do          
 
-     putStrLn$ "  Done handling request...\n"
-     return (Response { resCode, resHeaders, resBody })     
+	  allhelp <- doWork 
+
+	  -- Create a JSON representation of the results:
+	  let 
+	      jsarr = showJSON$ map matchToJSON (matchTreeToList allhelp)
+
+	      -- TODO: include some extra info at the top level:
+	      jsobj = toJSObject $ 
+		 [("resultArray", jsarr)
+		  -- other stuff
+		 ]
+	      resBody = encode jsarr
+	      response = Response { resCode, resHeaders, resBody }
+
+	  putStrLn$ "  Done handling request.\n  Response: "++ show response ++ "\n"
+	  return response     
+
+      ------------------------------------------------------------
+      Just "create" -> 
+	   error "FINISHME: New entry creation unfinished!"
+
+      ------------------------------------------------------------
+      Just command -> error$ "Unknown command received: "++ show command
+
 
   where
    args = M.fromList$ queryToArguments$ uriQuery reqURI
@@ -92,6 +117,18 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
 
    resCode    = 0
    resHeaders = [("Content-Type", "application/json")]
+
+   doWork = do 
+     ----------------------------------------------------------------------
+     -- Do the actual work:
+     txtfiles <- listAllFiles root
+     allhelp <- findHelpFiles False "" terms [partition_dateTags, partition_paragraphs] txtfiles
+     -- Print out the structure of the match tree:
+     --    putStrLn$ render (pPrint allhelp)
+     printMatchTree allhelp
+     return allhelp
+     ----------------------------------------------------------------------
+
 
 
 
