@@ -36,7 +36,7 @@ import Text.Regex.Posix
 import Prelude as P
 -- import System.Directory.Tree
 import System.FilePath.Find as FP
-
+import System.Directory
 import System.FilePath
 import System.IO
 
@@ -147,6 +147,10 @@ instance Pretty MatchTree where
 #endif
 
 type PartialMatch = S.AtomSet -- Just the subset of terms that were matched.
+
+matchTreeToList :: MatchTree -> [MatchHit]
+matchTreeToList (Match hit) = [hit]
+matchTreeToList (Node ls)   = concatMap matchTreeToList ls
 
 -- | @findHelp@ is a pure function that searches through a stream of
 --   text using a hierarchical scheme for subdividing its extent.
@@ -300,8 +304,10 @@ readAsLines caseinsensitive path =
 
 -- Find help within one file.
 findHelpFile :: Bool -> String -> [String] -> [Partitioner] -> FilePath -> IO MatchTree
-findHelpFile caseinsensitive methodname  terms partitioners file = 
-  do x <- readAsLines caseinsensitive file
+findHelpFile caseinsensitive methodname terms_ partitioners file = 
+  do 
+     let terms = if caseinsensitive then map (map toLower) terms_ else terms_
+     x <- readAsLines caseinsensitive file
      case x of 
        Just lines -> return$ findHelp methodname file terms partitioners lines
        Nothing    -> return$ Node []
@@ -311,3 +317,29 @@ findHelpFiles :: Bool -> String ->  [String] -> [Partitioner] -> [FilePath] -> I
 findHelpFiles caseinsensitive methodname terms partitioners files = 
   do allhelp <- P.mapM (findHelpFile caseinsensitive methodname terms partitioners) files
      return$ Node allhelp
+
+
+listAllFiles :: String -> IO [String]
+listAllFiles root =
+ do 
+    isdir    <- doesDirectoryExist root
+    isfile   <- doesFileExist      root
+    if isdir then do
+       chatter 2$ "Reading from root directory: "++show root
+#if 0
+       tree <- readDirectoryWithL return root
+       let allfiles = depthFirst tree
+#else 
+       allfiles <- fileNames root
+#endif
+       chatter 2 $ " Found " ++ show (length allfiles) ++ " regular files (following symlinks)."
+       chatter 4 $ " All files found :" ++ show allfiles
+
+-- TODO/FIXME: This should be OPTIONAL: We might not care about file extensions:
+       return$ filter isTextFile allfiles 
+
+    else if isfile then do
+       chatter 2$ "Reading from root file: "++show root
+       return [root]
+    else 
+       error$ "Root was not an existing directory or file!: "++ show root

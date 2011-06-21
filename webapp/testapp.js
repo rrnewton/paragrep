@@ -106,7 +106,9 @@ function makeSearchHitListEntry( i, str )
 {
     var result = "";
     result += ('<li class="arrow"><a id="'+i+'" href="javascript:viewFull('+i+')">'
-               + str.header +"  |  "+ str.body +'</a></li>');   
+               // + str.header +"  |  "+ str.body +'</a></li>'
+	       + str.header +'</a></li>'
+	       );   
     return result;  
 }
 
@@ -119,11 +121,14 @@ function generateResults() {
 
     var got_result = false;
     // var url = "http://wasp.ffh.us:6003/";
-    // var url = "http://localhost:6003/";
-    var url = "http://127.0.0.1:6003/";
+    var url = "http://localhost:6003/";
+    // var url = "http://127.0.0.1:6003/";
     // var url = "http://192.168.1.4:6003/";
 
     // Use jQuery to get search results from the remote server:
+
+    results += '<li class="arrow"><a id="blah" href="#searchResults"> Loading results from: '+ url +'</a></li>';
+    document.getElementById("searchResultsContent").innerHTML = results;
 
     // This one works but there is a parsing job:
     //--------------------------------------------------------------------------------
@@ -136,7 +141,7 @@ function generateResults() {
          var parsed = jQuery.parseJSON( stripped );
          global_result_array = parsed;
          // alert("Parsed: "+ parsed );
-         // alert("Parsed fields: "+ parsed.date +" "+ parsed.header +" "+ parsed.body );
+         // alert("Parsed fields: "+ parsed.header +" "+ parsed.body );
 
          var i = 0;
 	 $.each(parsed, function(key, item) 

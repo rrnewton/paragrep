@@ -31,7 +31,6 @@ import Data.IORef
 import Numeric (readDec)
 
 import Prelude as P
-import System.Directory
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
@@ -133,7 +132,7 @@ safeRead s =
 paragrepMain = 
  do 
     args <- getArgs
-    (opts,terms_) <- 
+    (opts,terms) <- 
        case getOpt Permute options args of
 	 (o,rest,[])  -> return (o,rest)
          (_,_,errs)   -> defaultErr errs
@@ -150,14 +149,6 @@ paragrepMain =
       putStrLn$ usageInfo usage options
       exitSuccess
 
-    case (mapMaybe getRunServer opts) of 
-      [port] -> do chatter 1$ "Running server on port " ++ show port
-		   runServer port defaultHandler
-		   chatter 1$ "Server exited."
-		   exitSuccess
-      [] -> return ()
-      ls -> error$ "Cannot run server on multiple ports: "++ show ls
-
     ------------------------------------------------------------
 
     let caseinsensitive = CaseInsensitive `elem` opts
@@ -168,12 +159,8 @@ paragrepMain =
       [Just n]  -> writeIORef  verbosityRef n
       _         -> error "More than one -verbose flag not currently allowed."
 
-    let terms = if caseinsensitive then map (map toLower) terms_ else terms_
-    when (terms == [])$ defaultErr ["  NO SEARCH TERMS"]
-
-    chatter 2$ "Searching for terms: " ++ show terms
-
     let 
+
         root = case mapMaybe getRoot opts of 
 	        []  -> "."
 	        [r] -> r
@@ -194,35 +181,25 @@ paragrepMain =
 		      [str] -> error "Custom hierarchy descriptions not implemented yet."
 	
 
-    isdir    <- doesDirectoryExist root
-    isfile   <- doesFileExist      root
-    txtfiles <- 
-      if isdir then do
-         chatter 2$ "Reading from root directory: "++show root
-#if 0
-	 tree <- readDirectoryWithL return root
-	 let allfiles = depthFirst tree
-#else 
-	 allfiles <- fileNames root
-#endif
-	 chatter 2 $ " Found " ++ show (length allfiles) ++ " regular files (following symlinks)."
-	 chatter 4 $ " All files found :" ++ show allfiles
+    ----------------------------------------------------------------------
+    -- Choose either batch or server execution mode:
 
--- TODO/FIXME: This should be OPTIONAL: We might not care about file extensions:
-	 return$ filter isTextFile allfiles 
-
-      else if isfile then do
-         chatter 2$ "Reading from root file: "++show root
-	 return [root]
-      else 
-	 error$ "Root was not an existing directory or file!: "++ show root
-
-    allhelp <- findHelpFiles caseinsensitive initmethod terms hierarchy txtfiles
-
--- Print out the structure of the match tree:
---    putStrLn$ render (pPrint allhelp)
-
-    printMatchTree allhelp
+    case (mapMaybe getRunServer opts) of 
+      [port] -> do chatter 1$ "Running server on port " ++ show port
+		   runServer port root
+		   chatter 1$ "Server exited."
+		   exitSuccess
+      a:b:t -> error$ "Cannot run server on multiple ports: "++ show (a:b:t)
+      [] -> do
+	 ----------------------------------------------------------------------
+	 when (terms == [])$ defaultErr ["  NO SEARCH TERMS"]
+	 chatter 2$ "Searching for terms: " ++ show terms
+	 txtfiles <- listAllFiles root
+	 allhelp <- findHelpFiles caseinsensitive initmethod terms hierarchy txtfiles
+	 -- Print out the structure of the match tree:
+	 --    putStrLn$ render (pPrint allhelp)
+	 printMatchTree allhelp
+	 ----------------------------------------------------------------------
 
 --    BL.-putStrLn "Done."
 
