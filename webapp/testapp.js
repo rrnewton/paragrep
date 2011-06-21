@@ -6,7 +6,7 @@ var jQT = $.jQTouch({
     statusBar: 'black'
 });
 
-var debug_mode = true;
+var debug_mode = false;
 var global_searchterms;
 var global_newEntryText;
 var global_result_array;
@@ -200,10 +200,12 @@ function sendNewEntry() {
 	  function(data) {
          if(debug_mode) alert("Server responded to new note with "+ typeof(data)  +":\n <" + data + ">");
 
-         var stripped = stripHeadersHack(data);
-         var parsed = jQuery.parseJSON( stripped );
+         // For some reason I'm not getting the same headers here.  Weird:
+         // var stripped = stripHeadersHack(data);
+         // var parsed = jQuery.parseJSON( stripped );
+         // alert("Got stripped/parsed: " + parsed);
 
-         response += '<li class="sep"> '+ parsed +' </li>';
+         response += '<li class="sep"> '+ data +' </li>';
          document.getElementById("newEntryServerResponse").innerHTML = response;
       }, "html");
 

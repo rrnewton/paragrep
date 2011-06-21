@@ -6,6 +6,7 @@ module Paragrep.Server ( runServer, defaultHandler ) where
 import Paragrep.Lib
 
 import Data.List.Split
+import Data.List
 import Data.Maybe
 import qualified Data.Map as M
 import Network.Shed.Httpd
@@ -41,8 +42,19 @@ matchToJSON MatchHit{file,method,line,matchtext} =
 --   body   = B.unlines$  map (`B.append` "<br>") lns
    header = head (dropWhile B.null lns)
 
--- caseinsensitive, initmethod, hierarchy
 
+-- There must be a library routine for this but I can't find it.
+-- In the http request I get things like "foo+bar" as well as the percent characters.
+-- unEscapeString works for the percent characters but not the spaces.
+decodeQueryString :: String -> [String]
+decodeQueryString str =
+   map unEscapeString $   -- from Network.URI
+   filter (not . null) $ 
+   splitOn "+" $ 
+   str
+
+
+----------------------------------------------------------------------------------------------------
 defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) = 
 
 --  do putStrLn$ "Handling request " ++ reqMethod ++" "++ show (queryToArguments$ uriQuery reqURI)
@@ -102,14 +114,16 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
 	      resBody = encode (JSObject jsobj)
 	      response = Response { resCode, resHeaders, resBody }
 
-	  putStrLn$ "  Done handling request.\n  Response: "++ show response ++ "\n"
+	  putStrLn$ "  Done handling request."
+	  -- putStrLn$ "  Response: "++ show response ++ "\n"
 	  return response     
 
       ------------------------------------------------------------
       Just "create" -> do
            let file = "./webapp_created_notes.txt"
 	       -- body = reqBody -- Couldn't figure out how to populate this.
-	       body = args M.! "body"
+	       body = concat$ intersperse " " $
+		      decodeQueryString$ args M.! "body"
 
            putStrLn$ "  Writing new entry to file "++file++ 
 		     ": \n================================================================================\n" 
@@ -126,9 +140,7 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
   where
    args = M.fromList$ queryToArguments$ uriQuery reqURI
    name = args M.! "name"
-   terms = filter (not . null) $ 
-	   splitOn "+" $ 
-	   args M.! "terms"
+   terms = decodeQueryString $ args M.! "terms"
 
    resCode    = 0
    resHeaders = [("Content-Type", "application/json")]
