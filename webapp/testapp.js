@@ -6,8 +6,9 @@ var jQT = $.jQTouch({
     statusBar: 'black'
 });
 
-var debug_mode = false;
+var debug_mode = true;
 var global_searchterms;
+var global_newEntryText;
 var global_result_array;
 
 // Bind event handlers:
@@ -19,6 +20,9 @@ $(document).ready(function(){
 
     //    $('#startSearch form').submit(sendSearch);
     $('#home form').submit(sendSearch);
+
+    $('#newEntry form').submit(sendNewEntry);
+
 });
 
 
@@ -87,7 +91,6 @@ function stripHeadersHack( str ) {
         i++;
     }
 
-    // for(var j=0; j<i; j++) {   delete arr[j];    }
     if (i === len)
     {
         alert("Bad response from server.  Apparently containing no JSON object.");
@@ -113,108 +116,55 @@ function makeSearchHitListEntry( i, str )
 }
 
 
+function determineURL() {
+    var port = 6003;
+    var url = "http://localhost:"+port+"/";
+    if (  window.location.protocol === "http:" &&
+        ! window.location.hostname === "" )
+    {
+        url = "http://" + window.location.hostname + ":"+port+"/";
+    }
+    return url;
+}
+
 // This function dynamically produces a series of list elements.
 function generateResults() {
 
     var results = '';
     var termArray = global_searchterms.split(' ');
 
-    var got_result = false;
-    var port = 6003;
-    var url = "http://localhost:"+port+"/";
-    // var url = "http://wasp.ffh.us:6003/";
-    // var url = "http://127.0.0.1:6003/";
-
-    // Use jQuery to get search results from the remote server:
-
-    if (  window.location.protocol === "http:" &&
-        ! window.location.hostname === "" )
-    {
-        url = "http://" + window.location.hostname + ":"+port+"/";
-    }
+    var url = determineURL();
 
     //    results += '<li class="arrow"><a id="blah" href="#searchResults"> Current site URL: '+ document.URL +'</a></li>';
     results += '<li class="sep">Loading results from: '+ url +'</li>';
-
-    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL protocol: '+ window.location.protocol +'</a></li>';
-    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL Host: '+ window.location.hostname +'</a></li>';
-    // results += '<li class="arrow"><a id="blah" href="#searchResults"> URL Href: '+ window.location.href +'</a></li>';
-
     document.getElementById("searchResultsContent").innerHTML = results;
 
-    // This one works but there is a parsing job:
+
+    // Use jQuery to get search results from the remote server:
     //--------------------------------------------------------------------------------
     $.get(url, { name: "aUser"
 	       , command: "search"
 	       , terms: global_searchterms },
-	  function(data){
-         got_result = true;
+	  function(data) {
          if(debug_mode) alert("Data Loaded, type "+ typeof(data)  +":\n <" + data + ">");
 
          var stripped = stripHeadersHack(data);
          var parsed = jQuery.parseJSON( stripped );
-         global_result_array = parsed;
+         global_result_array = parsed.resultArray;
          // alert("Parsed: "+ parsed );
          // alert("Parsed fields: "+ parsed.header +" "+ parsed.body );
 
          var i = 0;
-	 $.each(parsed, function(key, item)
-	 {
-	     // alert("Typeof "+ typeof(item) + ".  Item itself: "+ item);
-	     results += makeSearchHitListEntry(i, item);
-	     // results += '<li class="arrow"><a id="0" href="#viewResult">' + item +'</a></li>';
-	     i++;
-	 });
-
-
-         // results += makeSearchHitListEntry(parsed);
- 	 //result += '<li class="arrow"><a id="0" href="#viewResult">' + parsed.header  +'</a></li>';
-	 // results += '<li class="arrow"><a id="0" href="#viewResult"> HUH </a></li>';
-
+         $.each(global_result_array, function(key, item)
+         {
+             // alert("Typeof "+ typeof(item) + ".  Item itself: "+ item);
+             results += makeSearchHitListEntry(i, item);
+             // results += '<li class="arrow"><a id="0" href="#viewResult">' + item +'</a></li>';
+             i++;
+         });
 
          document.getElementById("searchResultsContent").innerHTML = results;
       }, "html");
-    //--------------------------------------------------------------------------------
-
-    // THIS ONE ISNT WORKING:
-    //--------------------------------------------------------------------------------
-    // $.getJSON( url,
-    //            { name: "aUser", terms: global_searchterms },
-    //            function(data)
-    // {
-    //     alert("Data Loaded:\n " + data);
-
-    //     var items = [];
-
-    //     $.each(data, function(key, item)
-    //     {
-    //         results += '<li class="arrow"><a id="0" href="#viewResult">' + key + '</a></li>';
-    //     });
-
-    //     // $.each(data, function(key, val) {
-    //     //   items.push('<li id="' + key + '">' + val + '</li>');
-    //     // });
-
-    //     // $('<ul/>', {
-    //     //   'class': 'my-new-list',
-    //     //   html: items.join('')
-    //     // }).appendTo('body');
-
-    //     document.getElementById("searchResultsContent").innerHTML = results;
-    // });
-    //--------------------------------------------------------------------------------
-
-    // ----------------------------------------------------------------------------------------------------
-
-    // HMM, I get the below error and THEN I get the data loaded... it must be asynchronous.
-    // if (got_result)
-    //      alert("Done fetching results!");
-    // else alert("ERROR: Could not get result from server.");
-
-    // TEMP:
-    // termArray.forEach(function(item) {
-    //     results += '<li class="arrow"><a id="0" href="#viewResult">' + item + '</a></li>';
-    // });
 }
 
 function sendSearch() {
@@ -234,3 +184,28 @@ function viewFull(ind) {
     jQT.goTo("#viewFull", false, false);
 }
 
+
+function sendNewEntry() {
+    global_newEntryText = $('#newEntryText').val();
+    var url = determineURL();
+
+    var response = '<li class="sep">Server responded with:</li>';
+    document.getElementById("newEntryServerResponse").innerHTML = response;
+
+    $.get(url, { name: "aUser"
+	           , command: "create"
+	           , terms: "" 
+               , body: global_newEntryText },
+
+	  function(data) {
+         if(debug_mode) alert("Server responded to new note with "+ typeof(data)  +":\n <" + data + ">");
+
+         var stripped = stripHeadersHack(data);
+         var parsed = jQuery.parseJSON( stripped );
+
+         response += '<li class="sep"> '+ parsed +' </li>';
+         document.getElementById("newEntryServerResponse").innerHTML = response;
+      }, "html");
+
+    // jQT.goBack();
+}

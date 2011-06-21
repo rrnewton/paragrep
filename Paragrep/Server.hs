@@ -83,26 +83,41 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
       ------------------------------------------------------------
       Just "search" -> do          
 
-	  allhelp <- doWork 
-
+	  ----------------------------------------------------------------------
+	  -- Do the actual work:
+	  txtfiles <- listAllFiles root
+	  allhelp <- findHelpFiles False "" terms [partition_dateTags, partition_paragraphs] txtfiles
+	  -- Print out the structure of the match tree:
+	  --    putStrLn$ render (pPrint allhelp)
+	  printMatchTree allhelp
+	  ----------------------------------------------------------------------
 	  -- Create a JSON representation of the results:
-	  let 
-	      jsarr = showJSON$ map matchToJSON (matchTreeToList allhelp)
-
+	  let jsarr = showJSON$ map matchToJSON (matchTreeToList allhelp)
 	      -- TODO: include some extra info at the top level:
 	      jsobj = toJSObject $ 
-		 [("resultArray", jsarr)
-		  -- other stuff
+		 [ ("resultArray", jsarr)
+--		 , ("filesSearched", showJSON$ txtfiles)
+		 , ("numfiles", showJSON (length txtfiles))
 		 ]
-	      resBody = encode jsarr
+	      resBody = encode (JSObject jsobj)
 	      response = Response { resCode, resHeaders, resBody }
 
 	  putStrLn$ "  Done handling request.\n  Response: "++ show response ++ "\n"
 	  return response     
 
       ------------------------------------------------------------
-      Just "create" -> 
-	   error "FINISHME: New entry creation unfinished!"
+      Just "create" -> do
+           let file = "./webapp_created_notes.txt"
+	       -- body = reqBody -- Couldn't figure out how to populate this.
+	       body = args M.! "body"
+
+           putStrLn$ "  Writing new entry to file "++file++ 
+		     ": \n================================================================================\n" 
+		     ++ body
+           appendFile file ("\n\n" ++ body ++ "\n")
+	   return$ Response { resCode, resHeaders, 
+			      resBody= encode ("New note written successfully, "++ 
+					       show (length body) ++" characters"::String) }
 
       ------------------------------------------------------------
       Just command -> error$ "Unknown command received: "++ show command
@@ -118,16 +133,6 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
    resCode    = 0
    resHeaders = [("Content-Type", "application/json")]
 
-   doWork = do 
-     ----------------------------------------------------------------------
-     -- Do the actual work:
-     txtfiles <- listAllFiles root
-     allhelp <- findHelpFiles False "" terms [partition_dateTags, partition_paragraphs] txtfiles
-     -- Print out the structure of the match tree:
-     --    putStrLn$ render (pPrint allhelp)
-     printMatchTree allhelp
-     return allhelp
-     ----------------------------------------------------------------------
 
 
 
