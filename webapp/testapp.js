@@ -1,4 +1,13 @@
 
+/*
+ TODO LIST:
+   (*) Reset the Note textarea upon successful submission.
+   (*) Likewise, remove the previous success message when the submit button is pressed.
+   (*) Highlight output
+   (*) Show metadata (source file/line, length, etc)
+
+ */
+
 
 // Initialization:
 var jQT = $.jQTouch({
@@ -165,6 +174,9 @@ function generateResults() {
              // results += '<li class="arrow"><a id="0" href="#viewResult">' + item +'</a></li>';
              i++;
          });
+
+         if (global_result_array.length === 0)
+            results += '<li class="sep">No matches found!</li>';
 
          document.getElementById("searchResultsContent").innerHTML = results;
       }, "html");

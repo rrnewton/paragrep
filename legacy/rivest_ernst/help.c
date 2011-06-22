@@ -57,7 +57,7 @@
 char *SP[50];        /* Search patterns */
 int  NSP;            /* Number of search patterns */
 
-// RRN: Uhh, what a loser language.  I'm changing this...
+// RRN: I'm changing this to up the limit...
 //#define FILENAMESSIZE 4000
 #define FILENAMESSIZE 20000
 char filenames[FILENAMESSIZE]; /* list of files to search, separated by FILESEPCHAR's */
