@@ -52,8 +52,8 @@ import Text.PrettyPrint.HughesPJClass
 -- Our main datatype for text includes both a wordset and the raw text:
 type Lines = [(B.ByteString, S.AtomSet)]
 
-delines :: Lines -> B.ByteString 
-delines = B.unlines . map fst 
+deLines :: Lines -> B.ByteString 
+deLines = B.unlines . map fst 
 
 -- Hmm, why is this not defined in StringTable.AtomSet?
 instance Show S.AtomSet where 
@@ -212,7 +212,7 @@ printMatchTree (Match MatchHit{..}) =
      putStrLn ""
      putStrLn msg
      putStrLn sep
-     B.putStrLn (delines matchtext)
+     B.putStrLn (deLines matchtext)
 --     putStrLn$ "--------------------------------------------------------------------------------"
 printMatchTree (Node ls) = mapM_ printMatchTree ls 
 			   
@@ -285,7 +285,6 @@ readAsLines caseinsensitive path =
       return Nothing
 
      else do
-
       bytes <- B.readFile path
       let 
           lower = if caseinsensitive then B.map toLower else id
@@ -294,7 +293,12 @@ readAsLines caseinsensitive path =
 	  tryAtom x = if B.length x > 256 then Nothing
 		      else Just$ toAtom (lower x)
 
-	  doline line = (line, S.fromList$ mapMaybe tryAtom$ B.words line)
+          -- NOTE!  Currently we only consider the alphanumeric characters as making up "words":
+	  doline line = (line, S.fromList       $ 
+			       mapMaybe tryAtom $ 
+			       map (B.filter isAlphaNum) $ 
+			       B.words line
+			       )
 	  pairs = map doline lines
 
       return$ Just pairs

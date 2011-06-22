@@ -80,6 +80,7 @@ function myjstest() {
 }
 
 
+// This version is only used to scroll forward until the JSON begins:
 function stripHeadersHack( str ) {
     // Simple hack for now -- I don't know the right way -- drop lines until we see one
     // containing '{'.
@@ -117,10 +118,12 @@ function makeSearchHitListEntry( i, str )
 
 
 function determineURL() {
-    var port = 6003;
+    var port = window.location.port; // Leave it the same.
+    // var port = 6003;
+    // var port = 8080;
     var url = "http://localhost:"+port+"/";
     if (  window.location.protocol === "http:" &&
-        ! window.location.hostname === "" )
+          ! (window.location.hostname === "") )
     {
         url = "http://" + window.location.hostname + ":"+port+"/";
     }
@@ -174,14 +177,17 @@ function sendSearch() {
     global_searchterms = tmp;
 
     generateResults();
-    jQT.goTo("#searchResults", false, false);
+    // builtin animations: slide, slideup, dissolve, fade, flip, pop, swap, and cube
+    jQT.goTo("#searchResults", 'slideup', false);
 }
 
 function viewFull(ind) {
     var entry = global_result_array[ind];
     // Mutate the target page so it has the desired contents:
     document.getElementById("viewFullContent").innerHTML = entry.body;
-    jQT.goTo("#viewFull", false, false);
+    // I can't seem to get these to work:  pop, swap, cube
+    // jQT.goTo("#viewFull", 'ul li a', false);
+    jQT.goTo("#viewFull", 'dissolve', false);
 }
 
 

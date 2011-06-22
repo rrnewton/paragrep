@@ -13,6 +13,7 @@ import Network.Shed.Httpd
 import Network.URI
 import qualified Network.HTTP as N
 import Text.JSON
+import Debug.Trace
 
 #ifdef LAZYMODE
 import qualified Data.ByteString.Lazy.Char8 as B
@@ -38,9 +39,22 @@ matchToJSON MatchHit{file,method,line,matchtext} =
 	    ("body", showJSON body)]
  where 
    lns    = map fst matchtext
-   body   = B.concat ["<pre>", B.unlines lns, "</pre>"]
---   body   = B.unlines$  map (`B.append` "<br>") lns
+-- Word wrap is not working for me on iphone [2011.06.21]:
+--   body   = B.concat ["<pre style=\"word-wrap:break:word\">", B.unlines lns, "</pre>"]
+   -- Eek, should probably go to more trouble to ESCAPE characters here:
+   -- TODO!  Can also get fancy here and:
+   --   (1) Highlight search terms
+   --   (2) Highlight dates and do other rrn-text-mode style highlighting.
+   body   = B.unlines$  map (`B.append` "<br>") lns
    header = head (dropWhile B.null lns)
+
+stripHeadersHack str | "HTTP/" `isPrefixOf` str = 
+  -- Here we scroll forward until there is an empty line that separates the headers from the body.
+  unlines $ tail $ 
+  dropWhile (not . null) $ 
+  lines str
+
+stripHeadersHack str = str
 
 
 -- There must be a library routine for this but I can't find it.
@@ -57,14 +71,12 @@ decodeQueryString str =
 ----------------------------------------------------------------------------------------------------
 defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) = 
 
---  do putStrLn$ "Handling request " ++ reqMethod ++" "++ show (queryToArguments$ uriQuery reqURI)
   do 
      let uristr = uriToString id reqURI ""
-		  -- uriQuery reqURI
+		  -- uriQuery reqURIerms
      putStrLn$ "Handling request, method " ++ reqMethod ++", args "++ show args ++ " : "++ uristr
 #if 0
      putStrLn$ " queryToArguments " ++ show (args)
-     putStrLn$ " Search terms " ++ show terms
      putStrLn$ "Headers: " 
      mapM_ print reqHeaders
      putStrLn$ "Body: " ++ show reqBody
@@ -87,18 +99,32 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
 	  case response of 
 	    Left connErr -> error$ "simpleHTTP: connection ERROR: " ++ show connErr
 	    Right (N.Response{N.rspCode,N.rspHeaders,N.rspBody}) -> return$
-	       Response { resCode = 0   -- TODO: translate the code
-			, resHeaders= map (\ (N.Header k s) -> (show k,s)) rspHeaders
-			, resBody = rspBody }
+	       -- let stripped = stripHeadersHack rspBody in 
+	       -- trace ("STRIPPED "++ stripped) $
+	       -- Strip out some of the headers to avoid duplicates:
+	       let stripHeaders = [N.HdrConnection, N.HdrContentLength] in
+	       trace ("  Apache Response Code: " ++ show rspCode) $
+	       -- trace ("HEADERS " ++ show rspHeaders)
+	       Response { resCode 
+			, resHeaders= map (\ (k,s) -> (show k,s)) $ 
+			              filter (not . (`elem` stripHeaders) . fst) $ 
+			              map (\ (N.Header k s) -> (k,s)) $ 
+			              rspHeaders
+			-- Annoyingly, we can end up duplicating the headers here... ick:
+			-- , resBody = stripped -- The headers didn't actually appear here to be stripped.
+			, resBody = rspBody
+			}
 
       -- Otherwise  we've got a request for the web app itself:
       ------------------------------------------------------------
       Just "search" -> do          
+	  putStrLn$ " Search terms " ++ show terms
 
 	  ----------------------------------------------------------------------
 	  -- Do the actual work:
 	  txtfiles <- listAllFiles root
-	  allhelp <- findHelpFiles False "" terms [partition_dateTags, partition_paragraphs] txtfiles
+	  -- Setting case insensitive:
+	  allhelp <- findHelpFiles True "" terms [partition_dateTags, partition_paragraphs] txtfiles
 	  -- Print out the structure of the match tree:
 	  --    putStrLn$ render (pPrint allhelp)
 	  printMatchTree allhelp
@@ -142,7 +168,7 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
    name = args M.! "name"
    terms = decodeQueryString $ args M.! "terms"
 
-   resCode    = 0
+   resCode    = 200 -- 'OK' in HTTP speak.
    resHeaders = [("Content-Type", "application/json")]
 
 
