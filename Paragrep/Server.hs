@@ -1,6 +1,13 @@
 {-# LANGUAGE OverloadedStrings, NamedFieldPuns, CPP #-} 
 {-# OPTIONS_GHC -fwarn-unused-imports #-}
 
+-- ASSUMPTION: Currently writes (appends) to a hardwired file in the current directory.
+
+-- TODO: Document the protocol for "search" and "create" HTTP commands to this server.
+
+-- [2011.09.27] What did I conclude post-facto was the RIGHT way to do this?
+-- Just to use a CGI script called on demand?
+
 module Paragrep.Server ( runServer, defaultHandler ) where
 
 import Paragrep.Lib
@@ -20,6 +27,13 @@ import qualified Data.ByteString.Lazy.Char8 as B
 #else 
 import qualified Data.ByteString.Char8      as B
 #endif 
+
+
+-- local_root = "http://localhost:80/"
+local_root = "http://localhost:85/"
+notes_file = "./webapp_created_notes.txt"
+
+-- ==================================================================================================
 
 -- data MatchHit = MatchHit { file::String, method::String, line::Int, matchtext::Lines }
 --   deriving Show
@@ -88,10 +102,10 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
       -- Heuristic: If it is a normal http request we send it through to apache to serve.
       -- TOFIX: We could do this ourselves and serve up the webapp directly.
       Nothing -> do 
-	  putStrLn$ "   => REDIRECTING query to apache... "
+	  putStrLn$ "   => REDIRECTING query to apache ... "++ local_root ++ uristr
 	  response <- N.simpleHTTP $ N.Request 
 	       -- Redirect to localhost on the normal port:
-	       { N.rqURI     = fromJust$ parseURI$ "http://localhost:80/" ++ uristr
+	       { N.rqURI     = fromJust$ parseURI$ local_root ++ uristr
                , N.rqMethod  = N.GET
 	       , N.rqHeaders = []
 	       , N.rqBody    = reqBody
@@ -146,15 +160,15 @@ defaultHandler root (Request {reqMethod, reqURI, reqHeaders, reqBody}) =
 
       ------------------------------------------------------------
       Just "create" -> do
-           let file = "./webapp_created_notes.txt"
+           let 
 	       -- body = reqBody -- Couldn't figure out how to populate this.
 	       body = concat$ intersperse " " $
 		      decodeQueryString$ args M.! "body"
 
-           putStrLn$ "  Writing new entry to file "++file++ 
+           putStrLn$ "  Writing new entry to file "++notes_file++ 
 		     ": \n================================================================================\n" 
 		     ++ body
-           appendFile file ("\n\n" ++ body ++ "\n")
+           appendFile notes_file ("\n\n" ++ body ++ "\n")
 	   return$ Response { resCode, resHeaders, 
 			      resBody= encode ("New note written successfully, "++ 
 					       show (length body) ++" characters"::String) }
