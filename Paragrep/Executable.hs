@@ -49,7 +49,7 @@ import Paragrep.Server
 -- Command line options
 --------------------------------------------------------------------------------
 
--- | Recognized flags
+-- | Recognized flags, for documentation see `options` below.
 data CmdFlag = 
       NoColor
     | Help
@@ -76,7 +76,7 @@ getRunServer (RunServer x) = Just x
 getRunServer _             = Nothing
 -- </boilerplate>
 
-
+-- | Command line options and their meaning.
 options :: [OptDescr CmdFlag]
 options =
      [ 
